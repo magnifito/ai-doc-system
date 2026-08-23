@@ -1,0 +1,17 @@
+{
+  "name": "ai-doc-system",
+  "version": "1.0.0",
+  "description": "Tier a repository's docs by authority, validate frontmatter, generate an agent-readable index, and enforce it with a blocking gate.",
+  "type": "module",
+  "license": "UNLICENSED",
+  "private": true,
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test scripts/*.test.mjs",
+    "lint:docs": "node scripts/check-docs.mjs",
+    "lint:docs:advisory": "node scripts/check-docs-advisory.mjs",
+    "gen:docs-index": "node scripts/gen-docs-index.mjs"
+  }
+}
