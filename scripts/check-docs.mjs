@@ -20,7 +20,7 @@
  * check-docs-advisory.mjs.
  */
 import { execFileSync } from 'node:child_process'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join, dirname, resolve, relative } from 'node:path'
 import { parseFrontmatter } from './docs-frontmatter.mjs'
 import { loadConfig } from './docs-config.mjs'
@@ -39,7 +39,7 @@ export function checkDocs(root, config = loadConfig(root)) {
 
   for (const path of listDocs(root, config)) {
     // 3. path hygiene — the check that makes `Tracking & Attribution` unrepeatable
-    for (const message of pathHygieneErrors(path)) add(path, 'path', message)
+    for (const message of pathHygieneErrors(path, config)) add(path, 'path', message)
 
     if (isExempt(config, path)) continue
 
@@ -96,7 +96,7 @@ export function checkDocs(root, config = loadConfig(root)) {
       const resolved = target.startsWith(`${config.docsDir}/`)
         ? target
         : relative(root, resolve(join(root, dirname(path)), target)).split(/[\\/]/).join('/')
-      if (!existsSync(join(root, resolved))) add(path, 'link', `dead link -> ${target}`)
+      if (!existsCaseExact(root, resolved)) add(path, 'link', `dead link -> ${target}`)
     }
   }
 
@@ -105,7 +105,7 @@ export function checkDocs(root, config = loadConfig(root)) {
   // covered by 5a link syntax; bare prose mentions inside the tree stay
   // unchecked because historical plans legitimately narrate old paths.
   for (const target of trackedDocRefs(root, config)) {
-    if (!existsSync(join(root, target))) {
+    if (!existsCaseExact(root, target)) {
       add('(repo)', 'link', `a tracked file references ${target}, which does not exist — git grep -l '${target}'`)
     }
   }
@@ -117,6 +117,22 @@ export function checkDocs(root, config = loadConfig(root)) {
   }
 
   return violations
+}
+
+/**
+ * `existsSync` with the case checked, because macOS and Windows resolve
+ * `./FOO.md` to `foo.md` and would report a link as live after the file was
+ * renamed. The same tree then fails on Linux. Reads the parent directory and
+ * requires the basename verbatim.
+ */
+function existsCaseExact(root, repoRelative) {
+  const full = join(root, repoRelative)
+  if (!existsSync(full)) return false
+  try {
+    return readdirSync(dirname(full)).includes(repoRelative.split('/').pop())
+  } catch {
+    return false
+  }
 }
 
 /** The configured path prefix of a tier kind, for error messages. */

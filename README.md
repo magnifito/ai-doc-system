@@ -25,7 +25,7 @@ into an explicitly non-binding idea bank, and it is checkable by machine.
 | `scripts/check-docs-advisory.mjs` | Non-blocking: dead `code:` pointers, `updated:`-versus-git drift. |
 | `scripts/migrate-docs.mjs` | One-shot: `git mv` into the tiers, stamp frontmatter, rewrite every tracked reference. Deleted after it runs. |
 | `scripts/docs-config.mjs` | Per-project configuration, with defaults that need no config file. |
-| `scripts/*.test.mjs` | 30 tests over throwaway fixture trees, some of them real git repositories. Wire them in — a suite no runner executes is green exactly once. |
+| `scripts/*.test.mjs` | 34 tests over throwaway fixture trees, some of them real git repositories. Wire them in — a suite no runner executes is green exactly once. |
 | `SKILL.md` | The agent-facing procedure, including the judgement calls the mechanics do not cover. |
 | `templates/` | The migration map to fill in, and the `docs/README.md` contract to adapt. |
 | `reference/` | The full design: the problem, the two rejected alternatives, and the limitations that survived implementation. |
@@ -71,8 +71,11 @@ Optional: `implements:` (validated when present), `code:`. Required on `supersed
 1. Frontmatter present and parseable outside the exempt list.
 2. Closed vocabularies — `status` in its set, `title`/`updated` present, no `kind` field, status
    agrees with the tier **in both directions**, `implements` names a file that exists.
-3. Path hygiene — kebab-case directories, kebab-or-ALL-CAPS basenames. This is what makes a
-   `Tracking & Attribution/` directory impossible to reintroduce.
+3. Path hygiene and naming — kebab-case directories; kebab-case basenames except a closed set of
+   sentinels (`README`, `INDEX`, `STATUS`, `ROADMAP`, `PRD`, …) and any programme prefix the project
+   declares. Hygiene alone would let `scrum-tasks.md` and `SCRUM-TASKS.md` both be legal; the naming
+   half is what stops that. Links resolve case-exactly, so a rename does not "pass" on macOS and
+   break on Linux.
 4. Index freshness — regenerated in memory and compared byte-for-byte with what is committed.
 5. No dead `.md` links, inside the tree and from every tracked file outside it.
 6. `status: superseded` implies a `superseded_by:` whose target exists.

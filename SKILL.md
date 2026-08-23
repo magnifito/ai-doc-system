@@ -117,6 +117,12 @@ The migration is the easy half. These are the calls that decide whether the resu
 - **A "closed" plan that still lists untaken steps is a live backlog.** It does not belong in
   `done/`.
 - **Two files with the same basename in one tier is the defect you are removing.** Rename one.
+- **Settle naming before you migrate, not after.** Kebab-case is the default; decide the sentinel
+  set (`README`, `INDEX`, `STATUS`, `ROADMAP`, `PRD` …) and whether the project has a programme
+  prefix worth declaring (`OPUS-`, `RFC-`), and put both in `docs-system.config.json`. An undeclared
+  carve-out is not a convention, it is the absence of one — and the survey will show you the proof:
+  grep for the same stem in two casings. Renaming for case alone needs **two** `git mv`s through a
+  temporary name on macOS and Windows.
 - **Say what you deviated from and why.** The design is a record; a departure from it that nobody
   wrote down becomes a bug for the next reader.
 

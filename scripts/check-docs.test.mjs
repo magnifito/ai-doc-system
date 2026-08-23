@@ -108,12 +108,33 @@ test('2f. an implements target must exist when the field is present', () => {
   assert.deepEqual(good.filter((v) => v.field === 'implements'), [])
 })
 
-test('3a. kebab-case and ALL-CAPS basenames pass hygiene', () => {
+test('3a. kebab-case names and ALL-CAPS sentinels pass', () => {
   const violations = run({
-    'docs/plans/BIG-PLAN.md': doc({ title: 'Big plan', status: 'active', updated: '2026-08-17' }),
+    'docs/plans/big-plan.md': doc({ title: 'Big plan', status: 'active', updated: '2026-08-17' }),
     'docs/reference/payments/PRD.md': doc({ title: 'Payments', status: 'reference', updated: '2026-05-29' }),
+    'docs/reference/payments/README.md': doc({ title: 'Payments', status: 'reference', updated: '2026-05-29' }),
   })
   assert.deepEqual(violations.filter((v) => v.field === 'path'), [])
+})
+
+test('3c. an ALL-CAPS name that is not a sentinel is rejected', () => {
+  const violations = run({
+    'docs/plans/BIG-PLAN.md': doc({ title: 'Big plan', status: 'active', updated: '2026-08-17' }),
+  })
+  const paths = violations.filter((v) => v.field === 'path')
+  assert.equal(paths.length, 1)
+  assert.match(paths[0].message, /not a sentinel/)
+})
+
+test('3d. the same concept in two casings cannot both be legal', () => {
+  // The defect this rule exists for: hygiene alone accepted both of these.
+  const violations = run({
+    'docs/reference/a/scrum-tasks.md': doc({ title: 'A', status: 'reference', updated: '2026-05-29' }),
+    'docs/reference/b/SCRUM-TASKS.md': doc({ title: 'B', status: 'reference', updated: '2026-05-29' }),
+  })
+  const paths = violations.filter((v) => v.field === 'path')
+  assert.equal(paths.length, 1)
+  assert.ok(paths[0].file.endsWith('SCRUM-TASKS.md'))
 })
 
 test('3b. spaces, ampersands, MixedCase and underscores are rejected', () => {

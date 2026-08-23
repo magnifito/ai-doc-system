@@ -118,3 +118,37 @@ test('a malformed config file names itself in the error', () => {
     assert.throws(() => loadConfig(root), new RegExp(CONFIG_FILE))
   })
 })
+
+test('sentinels and programme prefixes are configurable per project', () => {
+  const config = { sentinels: ['README'], allowedBasenamePrefixes: ['RFC-'] }
+  const files = {
+    'docs/engineering/README.md': ACTIVE,          // sentinel — allowed
+    'docs/engineering/RFC-0001.md': ACTIVE,        // declared prefix — allowed
+    'docs/engineering/plain-note.md': ACTIVE,      // kebab — always allowed
+    'docs/engineering/STATUS.md': ACTIVE,          // dropped from this project's sentinels
+  }
+  withFixture(files, config, (root) => {
+    const paths = checkDocs(root).filter((v) => v.field === 'path')
+    assert.deepEqual(paths.map((v) => v.file), ['docs/engineering/STATUS.md'])
+    assert.match(paths[0].message, /not a sentinel/)
+  })
+})
+
+test('a case-only rename is caught even on a case-insensitive filesystem', () => {
+  // macOS and Windows resolve ./FOO.md to foo.md, so existsSync alone reports a
+  // link as live after the file has been renamed — and the tree then breaks on
+  // Linux. The gate compares the basename against the real directory listing.
+  const body = '---\ntitle: A\nstatus: active\nupdated: 2026-08-23\n---\n\n# A\n\n[b](./b-note.md) [c](./C-NOTE.md)\n'
+  withFixture(
+    {
+      'docs/engineering/a.md': body,
+      'docs/engineering/b-note.md': ACTIVE,
+      'docs/engineering/c-note.md': ACTIVE,
+    },
+    undefined,
+    (root) => {
+      const links = checkDocs(root).filter((v) => v.field === 'link')
+      assert.deepEqual(links.map((v) => v.message), ['dead link -> ./C-NOTE.md'])
+    },
+  )
+})

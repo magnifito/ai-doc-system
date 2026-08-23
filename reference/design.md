@@ -272,11 +272,30 @@ one.**
 2. **Closed vocabularies.** `status` is a member of its closed set; `title` and `updated` are present;
    a `kind:` field is rejected; status agrees with the tier in both directions (§4.3); an
    `implements:` field, when present, names a file that exists.
-3. **Path hygiene.** Directory segments must be strictly lowercase-kebab (`^[a-z0-9-]+$`). File
-   basenames may additionally be ALL-CAPS (`^[A-Z0-9-]+$`), a convention most repositories already
-   use: `README.md`, `PRD.md`, `STATUS.md`. Spaces, underscores, `&` and MixedCase are rejected
-   everywhere. This is what makes the `Tracking & Attribution` class of defect impossible to
-   reintroduce, without forcing a pointless rename of hundreds of files named `PRD.md`.
+3. **Path hygiene, and naming.** Two rules that are easy to confuse, and the second one is the one
+   most trees are missing.
+
+   *Hygiene* is a character rule: directory segments must be strictly lowercase-kebab
+   (`^[a-z0-9-]+$`), and spaces, underscores, `&` and MixedCase are rejected everywhere. This is
+   what makes the `Tracking & Attribution` class of defect impossible to reintroduce.
+
+   *Naming* says what a file may be **called**. Hygiene alone accepts `scrum-tasks.md` and
+   `SCRUM-TASKS.md` — the same concept, twice, both legal — which is how a tree ends up with no
+   naming system at all while passing every check. So basenames are kebab-case by default, and
+   ALL-CAPS is legal only for:
+   - a **sentinel** from a closed set (`config.sentinels`, default `README INDEX STATUS ROADMAP PRD
+     CHANGELOG LICENSE`) — names whose capitals mean *"entry point for this folder"*, which is why
+     hundreds of files called `PRD.md` do not need renaming; or
+   - a **declared programme prefix** (`config.allowedBasenamePrefixes`, empty by default) — for a
+     named programme whose identity is the string itself, referenced by that exact name across many
+     documents. A carve-out that is declared is a system; the same carve-out undeclared is the
+     absence of one.
+
+   Two consequences worth knowing before the migration. Renaming for case alone needs **two**
+   `git mv`s through a temporary name, because macOS and Windows are case-insensitive. And for the
+   same reason the gate resolves every link against the real directory listing rather than trusting
+   `existsSync`, which reports `./FOO.md` as live after the file became `foo.md` — the tree then
+   breaks only on Linux, which is the worst place to find out.
 4. **Index freshness** — regenerate `INDEX.md` and `index.json` in memory, compare against the
    committed files, fail on any difference. The fix is to run the generator, never a hand edit of a
    generated file. The index is sorted in plain codepoint order — never `localeCompare`, which is

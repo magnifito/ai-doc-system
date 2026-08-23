@@ -34,24 +34,51 @@ export function reservedStatuses(config) {
 }
 
 /**
- * Path hygiene. Directory segments are strictly lowercase-kebab. File basenames
- * may additionally be ALL-CAPS, which is a real convention most repositories
- * already use (README, PRD, STATUS, ADR-001). Everything else — spaces,
- * underscores, MixedCase, `&` — is rejected, because those are the paths that
- * break shell globbing and `find | xargs` loops.
+ * Path hygiene AND naming. Two rules that are easy to confuse:
+ *
+ *   HYGIENE is a character rule — no spaces, no `&`, no underscores, no
+ *   MixedCase — and it exists because those are the paths that break shell
+ *   globbing and `find | xargs` loops.
+ *
+ *   NAMING says what a file may be CALLED. Hygiene alone lets a tree hold
+ *   `scrum-tasks.md` beside `SCRUM-TASKS.md`, both legal, both the same
+ *   concept. So kebab-case is the default for every basename, and ALL-CAPS is
+ *   allowed only for a closed set of sentinels (config.sentinels — names whose
+ *   caps mean "entry point for this folder") or a declared programme prefix
+ *   (config.allowedBasenamePrefixes).
+ *
+ * Directory segments are always strictly lowercase-kebab; there are no sentinel
+ * directories.
  */
 const DIR_SEGMENT = /^[a-z0-9-]+$/
-const FILE_SEGMENT = /^([a-z0-9-]+|[A-Z0-9-]+)$/
+const KEBAB = /^[a-z0-9-]+$/
+const ALL_CAPS = /^[A-Z0-9-]+$/
 
-export function pathHygieneErrors(path) {
+export function pathHygieneErrors(path, config) {
   const errors = []
   const segments = path.split('/')
   segments.forEach((segment, index) => {
     const isFile = index === segments.length - 1
     const bare = isFile ? segment.replace(/\.[a-z]+$/, '') : segment
-    const ok = isFile ? FILE_SEGMENT.test(bare) : DIR_SEGMENT.test(bare)
-    if (!ok) {
-      errors.push(`path segment "${segment}" is not ${isFile ? 'kebab-case or ALL-CAPS' : 'kebab-case'}`)
+    if (!isFile) {
+      if (!DIR_SEGMENT.test(bare)) errors.push(`path segment "${segment}" is not kebab-case`)
+      return
+    }
+    if (KEBAB.test(bare)) return
+    if (!ALL_CAPS.test(bare)) {
+      errors.push(`file name "${segment}" is not kebab-case`)
+      return
+    }
+    // ALL-CAPS: legal only as a sentinel or under a declared programme prefix.
+    if (!config) return
+    const sentinel = config.sentinels.includes(bare)
+    const prefixed = config.allowedBasenamePrefixes.some((prefix) => bare.startsWith(prefix))
+    if (!sentinel && !prefixed) {
+      errors.push(
+        `file name "${segment}" is ALL-CAPS but not a sentinel ` +
+          `(${config.sentinels.join(', ')})${config.allowedBasenamePrefixes.length ? ` or a declared prefix (${config.allowedBasenamePrefixes.join(', ')})` : ''}` +
+          ' — rename it to kebab-case',
+      )
     }
   })
   return errors

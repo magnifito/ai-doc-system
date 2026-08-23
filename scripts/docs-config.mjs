@@ -49,6 +49,26 @@ export const DEFAULTS = {
   /** Files exempt from frontmatter, relative to `docsDir`. */
   exempt: ['INDEX.md', 'README.md'],
 
+  /**
+   * NAMING. Path hygiene alone is a character rule — it rejects spaces and
+   * MixedCase but says nothing about what a file should be CALLED, so a tree can
+   * pass it while holding `scrum-tasks.md` beside `SCRUM-TASKS.md`. These two
+   * settings make the convention checkable.
+   *
+   * `sentinels` is the closed set of ALL-CAPS basenames that are allowed to
+   * shout, because their caps carry meaning: this is the entry point for its
+   * folder. Everything else is kebab-case.
+   */
+  sentinels: ['README', 'INDEX', 'STATUS', 'ROADMAP', 'PRD', 'CHANGELOG', 'LICENSE'],
+
+  /**
+   * ALL-CAPS prefixes for named programmes whose identity is the string itself —
+   * referenced by name across many documents, so renaming them costs more than
+   * the consistency is worth. A declared carve-out, not an accident: a name only
+   * qualifies if it starts with one of these AND is otherwise ALL-CAPS.
+   */
+  allowedBasenamePrefixes: [],
+
   /** Kind order in the generated INDEX.md; unlisted kinds follow, in tier order. */
   tierOrder: ['product', 'engineering', 'adr', 'runbook', 'plan', 'reference', 'archive'],
 
