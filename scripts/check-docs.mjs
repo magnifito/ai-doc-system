@@ -16,7 +16,8 @@
  *
  * What it deliberately does NOT check — document age, prose style, whether
  * `code:` targets still exist, whether `updated:` matches git — is argued in
- * reference/design.md section 5.3 and reported by check-docs-advisory.mjs.
+ * the design's section 5.3 (github.com/magnifito/ai-doc-system) and reported by
+ * check-docs-advisory.mjs.
  */
 import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'

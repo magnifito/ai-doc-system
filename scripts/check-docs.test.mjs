@@ -6,9 +6,10 @@
  *
  * Run: node --test scripts/check-docs.test.mjs
  *
- * Uses `node:test` rather than Vitest deliberately — see 01-design.md
- * section 5.5: the suite is wired in as `bun run test:scripts`, a root script
- * added to BLOCKING next to `lint:docs`.
+ * Uses `node:test` rather than a project's own test framework deliberately — see
+ * the design's section 5.5 (github.com/magnifito/ai-doc-system): the scripts stay
+ * dependency-free and portable, and the suite is wired into the host project's
+ * blocking gate next to `lint:docs`.
  */
 import { strict as assert } from 'node:assert'
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'

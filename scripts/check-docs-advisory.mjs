@@ -3,9 +3,9 @@
  * ADVISORY documentation checks — reported, never blocking. Runs as part of
  * `bun run verify:extras` and always exits 0.
  *
- * Two things the blocking gate deliberately refuses to assert (01-design.md
- * section 5.3), because either one would fail a push for a reason unrelated to
- * the change that triggered it:
+ * Two things the blocking gate deliberately refuses to assert (design section 5.3
+ * — github.com/magnifito/ai-doc-system), because either one would fail a push for
+ * a reason unrelated to the change that triggered it:
  *
  *   1. `code:` pointers that no longer resolve. An ordinary refactor moves a
  *      directory; the doc is then wrong, but the refactor is not.
