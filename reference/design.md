@@ -157,9 +157,16 @@ updated: 2026-05-29           # ISO date, required — see 4.6 for who maintains
 ---
 ```
 
-There is **no `kind` field**. A document's kind is derived from its path (§4.2); storing it in
-frontmatter would duplicate what the path already says, and the gate would exist partly to check that
-duplication. A `kind:` line in frontmatter is itself a violation.
+`kind` is **derived from the path and also stored** (§4.2), and the gate asserts the two agree.
+
+> **Reversal, 2026-08-23.** This section used to forbid a `kind:` field, on the argument that
+> storing a derived value duplicates what the path already says and buys one assertion class whose
+> only job is to check the duplication. That argument weighed the wrong cost. A document is
+> routinely read **outside its tree** — pasted into a conversation, handed to an agent as a blob,
+> opened from a search result — and in that setting a path-derived field is simply absent. The
+> document then cannot say what it is. Self-containment is worth one cheap assertion, and a
+> duplicate that is machine-checked on every push cannot drift. The price is that `git mv` alone no
+> longer re-tiers a file; `fix-docs-frontmatter.mjs` restamps a whole move in one command.
 
 Documents in `product/` or `plans/` may carry two additional fields:
 
@@ -177,11 +184,37 @@ Documents of `status: superseded` carry one additional field:
 superseded_by: docs/product/invoices.md   # required, and the target must exist
 ```
 
-### 4.2 `kind` — derived from the path
+### 4.2 `kind` — derived from the path, and stored
 
 Kind is computed from the tier a file lives in, with nested tiers matched before the tier that
-contains them. It appears in `index.json` as a derived column, never in frontmatter. Moving a file
-between tiers *is* changing its kind — one `git mv`, no second edit to forget.
+contains them. A tier prefix may hold a single `*` standing for exactly one path segment, so a
+project can group by something else first — `modules/*/state/` — and still derive kind from the
+tier segment inside it.
+
+It appears in `index.json`, and in frontmatter, and the gate rejects a document where the two
+disagree. Moving a file between tiers changes its kind; run `fix-docs-frontmatter.mjs` afterwards to
+restamp the field.
+
+### 4.2a `module` — the optional second axis
+
+A project may declare a closed set of `modules` in its configuration, each with a `class` (`core`,
+`anchor` or `addon`) and a `requires` list. Documents then live under `<moduleRoot><key>/<tier>/`,
+`module` is derived the same way `kind` is, stored the same way, and asserted the same way. A
+project that declares no modules is unaffected: every module assertion passes vacuously.
+
+Two families are what make the axis worth having:
+
+| Kind | Means | Extra required fields |
+|---|---|---|
+| `state` | Reflection. What the system IS today. | `verified_on`, `evidence` |
+| `todo` | Wishlist. What we want. | `commitment`, `changes` |
+
+Which kind demands which fields is configuration (`requiredFields`), not a constant in the scripts.
+
+`evidence` is the one field whose **value** the gate inspects: each entry is either a repository
+path that exists, optionally with `:line`, or a command a reader can re-run. Free prose is rejected,
+because an unevidenced claim is indistinguishable from a stale one — and a stale claim that nothing
+checks is the failure this whole system exists to prevent.
 
 `archive` is its own kind: an archived engineering doc and an archived plan share a lifecycle
 (`superseded`), and pretending they are still `plan`s would misclassify half of them.

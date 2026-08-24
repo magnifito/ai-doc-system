@@ -13,14 +13,18 @@
  *      its author stamped. The field means "last substantive change, per the
  *      author" (section 4.6), so a whitespace commit legitimately moves git's
  *      date and not the field's.
+ *   3. VERIFICATION drift — a `state` document whose `code:` has changed since
+ *      its `verified_on`. The claim is unverified, not wrong. Blocking would let
+ *      any commit under `code:` fail the docs gate, which is how a gate gets
+ *      bypassed rather than fixed.
  *
- * Both are worth knowing and neither is worth blocking on.
+ * All three are worth knowing and none is worth blocking on.
  */
 import { readFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { parseFrontmatter } from './docs-frontmatter.mjs'
 import { loadConfig } from './docs-config.mjs'
-import { isExempt } from './docs-taxonomy.mjs'
+import { isExempt, kindForPath } from './docs-taxonomy.mjs'
 import { lastCommitDate, listDocs, repoRoot } from './docs-fs.mjs'
 
 /**
@@ -35,6 +39,7 @@ function main() {
   const config = loadConfig(root)
   const deadCode = []
   const drifted = []
+  const unverified = []
 
   for (const path of listDocs(root, config)) {
     if (isExempt(config, path)) continue
@@ -48,6 +53,15 @@ function main() {
     if (data.updated) {
       const committed = lastCommitDate(root, path)
       if (committed && committed > data.updated) drifted.push({ path, stamped: data.updated, committed })
+    }
+
+    // A reflection document claims something is true as of `verified_on`. When
+    // the code it points at has moved since, the claim is unverified.
+    if (kindForPath(config, path) === 'state' && data.verified_on && data.code) {
+      const moved = lastCommitDate(root, data.code.split('#')[0].replace(/\/$/, ''))
+      if (moved && moved > data.verified_on) {
+        unverified.push({ path, verified: data.verified_on, code: data.code, moved })
+      }
     }
   }
 
@@ -64,6 +78,15 @@ function main() {
       console.log(`  ${path} — frontmatter ${stamped}, last commit ${committed}`)
     }
     if (drifted.length > DRIFT_CAP) console.log(`  … and ${drifted.length - DRIFT_CAP} more`)
+  }
+
+  if (unverified.length === 0) console.log('docs advisory: no verification drift')
+  else {
+    console.log(`docs advisory: ${unverified.length} state doc(s) whose code changed after \`verified_on\``)
+    for (const { path, verified, code, moved } of unverified.slice(0, DRIFT_CAP)) {
+      console.log(`  ${path} — verified ${verified}, ${code} changed ${moved}`)
+    }
+    if (unverified.length > DRIFT_CAP) console.log(`  … and ${unverified.length - DRIFT_CAP} more`)
   }
 
   process.exit(0)

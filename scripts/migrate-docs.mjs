@@ -31,7 +31,7 @@
  * lists or nested keys, and must not destroy them.
  */
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { firstHeading, parseFrontmatter, renderFrontmatter } from './docs-frontmatter.mjs'
@@ -57,12 +57,12 @@ async function loadMap(root) {
     )
     process.exit(2)
   }
-  const module = await import(pathToFileURL(file).href)
-  if (typeof module.destinationFor !== 'function') {
+  const loaded = await import(pathToFileURL(file).href)
+  if (typeof loaded.destinationFor !== 'function') {
     console.error(`${file} must export a destinationFor(path, helpers) function.`)
     process.exit(2)
   }
-  return module
+  return loaded
 }
 
 function statusFor(config, map, destination) {
@@ -90,6 +90,14 @@ function stampedContent(parsed, meta, body) {
  * the set matches what check-docs assertion 5b will later scan. Root-relative
  * paths only; relative links that cross tiers are caught by check-docs after.
  *
+ * `config.referenceScanExclude` is honoured here as well, and it has to be:
+ * those paths name documents that deliberately do not exist — most importantly
+ * THIS SYSTEM'S OWN TEST FIXTURES, which build throwaway trees under the default
+ * tier map. Rewriting a fixture's `docs/engineering/x.md` to wherever the host
+ * project moved that file leaves the suite asserting against a path its own
+ * configuration puts under no tier, and the tests fail for a reason that has
+ * nothing to do with the migration.
+ *
  * With `write: false` it only reports which files WOULD change (--dry-run).
  */
 function rewriteReferences(root, config, mapping, skip, { write }) {
@@ -105,8 +113,9 @@ function rewriteReferences(root, config, mapping, skip, { write }) {
     candidates = [] // no tracked file references a docs path
   }
   const changed = []
+  const excluded = [...skip, ...(config.referenceScanExclude ?? [])]
   for (const file of candidates) {
-    if (!file || skip.some((prefix) => file.startsWith(prefix))) continue
+    if (!file || excluded.some((prefix) => file.startsWith(prefix))) continue
     const full = join(root, file)
     if (!existsSync(full)) continue
     const before = readFileSync(full, 'utf8')
@@ -118,6 +127,24 @@ function rewriteReferences(root, config, mapping, skip, { write }) {
     }
   }
   return changed
+}
+
+/**
+ * Move one document, preferring `git mv` so `git log --follow` keeps working.
+ *
+ * An UNTRACKED file — a document written but not yet committed, which is normal
+ * mid-change — makes `git mv` fail with "not under version control". There is no
+ * history to follow for such a file, so a plain rename is exactly equivalent and
+ * the migration must not abort halfway through the tree because of one.
+ */
+function move(root, from, to) {
+  try {
+    execFileSync('git', ['mv', from, to], { cwd: root, stdio: 'pipe' })
+  } catch (error) {
+    const detail = `${error.stderr ?? ''}`
+    if (!detail.includes('not under version control')) throw error
+    renameSync(join(root, from), join(root, to))
+  }
 }
 
 async function main() {
@@ -191,8 +218,7 @@ async function main() {
   for (const { path, destination, meta, parsed } of rows) {
     if (path !== destination) {
       mkdirSync(join(root, dirname(destination)), { recursive: true })
-      // git mv keeps `git log --follow` working on every file.
-      execFileSync('git', ['mv', path, destination], { cwd: root })
+      move(root, path, destination)
     }
     writeFileSync(join(root, destination), stampedContent(parsed, meta, parsed.body))
   }

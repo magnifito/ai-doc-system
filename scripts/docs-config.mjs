@@ -36,6 +36,31 @@ export const DEFAULTS = {
     ['archive/', 'archive'],
   ],
 
+  /**
+   * Where per-module trees live, relative to `docsDir`, and the reserved key for
+   * everything cross-cutting. A project that does not group by module leaves
+   * `modules` empty; every module assertion then passes vacuously.
+   */
+  moduleRoot: 'modules/',
+  platformKey: 'platform',
+
+  /**
+   * The closed set of product modules. `class` is `core` (never sellable),
+   * `anchor` (sells on its own) or `addon` (sells only alongside an anchor).
+   * `requires` names the anchors an addon needs, and every name must itself be
+   * registered — a typo here would otherwise describe a dependency on nothing.
+   */
+  modules: [],
+
+  /**
+   * Extra frontmatter fields a kind demands, beyond `title`/`status`/`updated`.
+   * Keyed by kind, so the rule travels with the project rather than the script.
+   */
+  requiredFields: {},
+
+  /** Closed value sets for optional scalar fields, keyed by field name. */
+  vocabularies: {},
+
   /** Closed status vocabulary. A misspelled status is rejected, never stored. */
   statuses: ['reference', 'draft', 'active', 'shipped', 'superseded'],
 
@@ -100,9 +125,12 @@ export const DEFAULTS = {
     '.agents',
     '_bmad',
     'skills-lock.json',
-    'scripts/check-docs.test.mjs',
-    'scripts/docs-config.test.mjs',
-    'scripts/tracked-refs.test.mjs',
+    // A GLOB, not one entry per file. The list used to name each test by hand
+    // and fell behind every time a script gained one, and the gap only shows up
+    // once the new test is COMMITTED, because the scan reads tracked files: the
+    // repository's gate goes green and then fails on push. Git pathspec globs
+    // do not cross `/`, so this matches `scripts/*.test.mjs` and nothing deeper.
+    'scripts/*.test.mjs',
     'docs-migration.map.mjs',
   ],
 }
@@ -137,6 +165,7 @@ export function withDerived(config) {
   return {
     ...config,
     kinds: [...new Set(config.tiers.map(([, kind]) => kind))],
+    moduleKeys: [...config.modules.map((entry) => entry.key), config.platformKey],
     exemptPaths: new Set(config.exempt.map((name) => `${config.docsDir}/${name}`)),
   }
 }
@@ -166,6 +195,33 @@ function validate(overrides) {
     for (const status of Object.values(overrides.tierStatus)) {
       if (!overrides.statuses.includes(status)) {
         throw new Error(`${CONFIG_FILE}: tierStatus names "${status}", which is not in "statuses"`)
+      }
+    }
+  }
+  const CLASSES = ['core', 'anchor', 'addon']
+  if (overrides.modules) {
+    const keys = new Set(overrides.modules.map((entry) => entry.key))
+    for (const entry of overrides.modules) {
+      if (!entry.key) throw new Error(`${CONFIG_FILE}: every "modules" entry needs a "key"`)
+      if (!CLASSES.includes(entry.class)) {
+        throw new Error(
+          `${CONFIG_FILE}: module "${entry.key}" has class "${entry.class}" — expected ${CLASSES.join(' | ')}`,
+        )
+      }
+      for (const required of entry.requires ?? []) {
+        if (!keys.has(required)) {
+          throw new Error(
+            `${CONFIG_FILE}: module "${entry.key}" requires "${required}", which is not a registered module`,
+          )
+        }
+      }
+    }
+  }
+  if (overrides.requiredFields) {
+    const kinds = new Set((overrides.tiers ?? DEFAULTS.tiers).map(([, kind]) => kind))
+    for (const kind of Object.keys(overrides.requiredFields)) {
+      if (!kinds.has(kind)) {
+        throw new Error(`${CONFIG_FILE}: requiredFields names kind "${kind}", which no tier produces`)
       }
     }
   }

@@ -9,18 +9,67 @@
  * check the duplication; deriving it deletes both.
  */
 
+/**
+ * Turn a tier or exempt pattern into a matcher. A single `*` stands for exactly
+ * one path segment: a prefix of `modules`, then a wildcard, then `state` matches
+ * `modules/crm/state/x.md` and not `modules/crm/deep/state/x.md`. A pattern
+ * without a wildcard keeps the cheap `startsWith` behaviour.
+ */
+function patternMatcher(pattern) {
+  if (!pattern.includes('*')) {
+    return (rest) => rest.startsWith(pattern)
+  }
+  const source = pattern
+    .split('*')
+    .map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+    .join('[^/]+')
+  // A tier prefix ends in `/` and matches a PREFIX; an exempt glob names a file
+  // and must match the whole path.
+  const regex = pattern.endsWith('/') ? new RegExp(`^${source}`) : new RegExp(`^${source}$`)
+  return (rest) => regex.test(rest)
+}
+
+const matchers = new Map()
+
+function matcherFor(pattern) {
+  let matcher = matchers.get(pattern)
+  if (!matcher) {
+    matcher = patternMatcher(pattern)
+    matchers.set(pattern, matcher)
+  }
+  return matcher
+}
+
 /** Which `kind` a repo-relative path implies. First matching tier wins. */
 export function kindForPath(config, path) {
   const prefix = `${config.docsDir}/`
   if (!path.startsWith(prefix)) return null
   const rest = path.slice(prefix.length)
-  for (const [tierPrefix, kind] of config.tiers) if (rest.startsWith(tierPrefix)) return kind
+  for (const [tierPrefix, kind] of config.tiers) if (matcherFor(tierPrefix)(rest)) return kind
   return null
+}
+
+/**
+ * Which product module a path belongs to: the segment under `moduleRoot`, or
+ * the literal `platformKey` for anything under that tree. Null elsewhere —
+ * generated artefacts at the docs root have no module.
+ */
+export function moduleForPath(config, path) {
+  const prefix = `${config.docsDir}/`
+  if (!path.startsWith(prefix)) return null
+  const rest = path.slice(prefix.length)
+  if (rest.startsWith(`${config.platformKey}/`)) return config.platformKey
+  if (!rest.startsWith(config.moduleRoot)) return null
+  const key = rest.slice(config.moduleRoot.length).split('/')[0]
+  return key || null
 }
 
 /** True when a path is exempt from the frontmatter requirement. */
 export function isExempt(config, path) {
-  return config.exemptPaths.has(path)
+  const prefix = `${config.docsDir}/`
+  if (!path.startsWith(prefix)) return false
+  const rest = path.slice(prefix.length)
+  return config.exempt.some((pattern) => matcherFor(pattern)(rest))
 }
 
 /** The status a tier forces on every document in it, or null when it forces none. */

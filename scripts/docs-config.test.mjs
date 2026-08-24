@@ -10,7 +10,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import test from 'node:test'
-import { CONFIG_FILE, DEFAULTS, loadConfig } from './docs-config.mjs'
+import { CONFIG_FILE, DEFAULTS, loadConfig, withDerived } from './docs-config.mjs'
 import { kindForPath, isExempt } from './docs-taxonomy.mjs'
 import { checkDocs } from './check-docs.mjs'
 import { buildIndex, renderIndex } from './gen-docs-index.mjs'
@@ -151,4 +151,32 @@ test('a case-only rename is caught even on a case-insensitive filesystem', () =>
       assert.deepEqual(links.map((v) => v.message), ['dead link -> ./C-NOTE.md'])
     },
   )
+})
+
+
+test('module keys are derived from the module registry plus the platform key', () => {
+  const config = withDerived({
+    ...DEFAULTS,
+    modules: [
+      { key: 'core', class: 'core', requires: [] },
+      { key: 'crm', class: 'anchor', requires: [] },
+      { key: 'affiliates', class: 'addon', requires: ['store', 'billing'] },
+    ],
+  })
+  assert.deepEqual(config.moduleKeys, ['core', 'crm', 'affiliates', 'platform'])
+})
+
+test('a module registry entry with an unknown class is rejected', () => {
+  const root = fixture({}, { modules: [{ key: 'crm', class: 'anchor2', requires: [] }] })
+  assert.throws(() => loadConfig(root), /class "anchor2"/)
+})
+
+test('a module requiring a key that is not registered is rejected', () => {
+  const root = fixture({}, { modules: [{ key: 'affiliates', class: 'addon', requires: ['store'] }] })
+  assert.throws(() => loadConfig(root), /requires "store"/)
+})
+
+test('requiredFields naming a kind that no tier produces is rejected', () => {
+  const root = fixture({}, { requiredFields: { nonesuch: ['x'] } })
+  assert.throws(() => loadConfig(root), /requiredFields names kind "nonesuch"/)
 })

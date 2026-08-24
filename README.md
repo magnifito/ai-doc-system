@@ -58,6 +58,8 @@ config file at all.
 ```yaml
 ---
 title: Recurring Invoices   # required
+kind: reference             # required — must equal what the path implies
+module: billing             # required when the project declares modules
 status: reference           # required — reference | draft | active | shipped | superseded
 updated: 2026-05-29         # required — ISO date, bumped by the author of a substantive edit
 ---
@@ -65,6 +67,34 @@ updated: 2026-05-29         # required — ISO date, bumped by the author of a s
 
 Optional: `implements:` (validated when present), `code:`. Required on `superseded`:
 `superseded_by:`, whose target must exist.
+
+`kind` and `module` are derived from the path **and** stored, and the gate rejects a document where
+the two disagree. Storing them is what lets a document say what it is when it is read outside the
+tree; the assertion is what stops the duplicate drifting. After moving files, run
+`fix-docs-frontmatter.mjs` to restamp both.
+
+### The optional module axis
+
+A project may group `docs/` by product module first and tier second — `docs/modules/<key>/state/` —
+by declaring `modules` and wildcard tier prefixes in `docs-system.config.json`. Two families carry
+their own required fields:
+
+| Kind | Means | Required |
+|---|---|---|
+| `state` | Reflection — what the system IS today | `verified_on`, `evidence` |
+| `todo` | Wishlist — what we want | `commitment`, `changes` |
+
+```yaml
+kind: state
+verified_on: 2026-08-23
+evidence:
+  - "apps/api/src/pipelines/pipelines.controller.ts:24"   # a path that exists
+  - bunx nx test domain-pipelines                          # or a command to re-run
+```
+
+Every `evidence` entry must be a live path or a runnable command — free prose is rejected. Every
+`changes` entry must name a live document of kind `state`. A project that declares no modules is
+unaffected by any of this.
 
 ## What the gate asserts
 

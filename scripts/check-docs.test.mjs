@@ -17,11 +17,17 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import test from 'node:test'
 import { checkDocs } from './check-docs.mjs'
-import { buildIndex, renderJson, renderMarkdown } from './gen-docs-index.mjs'
+import { buildIndex, renderMarkdown, renderIndex } from './gen-docs-index.mjs'
+import { DEFAULTS, clearConfigCache, loadConfig, withDerived } from './docs-config.mjs'
 
 
-/** Build a fixture repo whose docs/ contains exactly `files`, with a fresh index. */
-function fixture(files, { withIndex = true } = {}) {
+/**
+ * Build a fixture repo whose docs/ contains exactly `files`, with a fresh index.
+ * `config` is the project's overrides; the index has to be built with the SAME
+ * resolved config the gate will use, or assertion 4 reports staleness that is
+ * an artefact of the fixture rather than a defect.
+ */
+function fixture(files, { withIndex = true, config } = {}) {
   const root = mkdtempSync(join(tmpdir(), 'docs-gate-'))
   for (const [path, content] of Object.entries(files)) {
     mkdirSync(join(root, dirname(path)), { recursive: true })
@@ -29,9 +35,11 @@ function fixture(files, { withIndex = true } = {}) {
   }
   mkdirSync(join(root, 'docs'), { recursive: true })
   if (withIndex) {
-    const entries = buildIndex(root)
-    writeFileSync(join(root, 'docs/index.json'), renderJson(entries))
-    writeFileSync(join(root, 'docs/INDEX.md'), renderMarkdown(entries))
+    const resolved = config ? withDerived({ ...DEFAULTS, ...config }) : undefined
+    for (const [path, content] of renderIndex(root, resolved)) {
+      mkdirSync(join(root, dirname(path)), { recursive: true })
+      writeFileSync(join(root, path), content)
+    }
   }
   return root
 }
@@ -46,11 +54,15 @@ function run(files, options) {
 }
 
 function doc(fields) {
-  const lines = Object.entries(fields).map(([key, value]) => `${key}: ${value}`)
+  const lines = []
+  for (const [key, value] of Object.entries(fields)) {
+    if (Array.isArray(value)) lines.push(`${key}:`, ...value.map((item) => `  - ${JSON.stringify(item)}`))
+    else lines.push(`${key}: ${value}`)
+  }
   return `---\n${lines.join('\n')}\n---\n\n# ${fields.title ?? 'Doc'}\n\nBody.\n`
 }
 
-const GOOD = doc({ title: 'Quality gate', status: 'active', updated: '2026-08-17' })
+const GOOD = doc({ title: 'Quality gate', kind: 'engineering', status: 'active', updated: '2026-08-17' })
 
 test('1a. a well-formed doc produces no violations', () => {
   assert.deepEqual(run({ 'docs/engineering/quality-gate.md': GOOD }), [])
@@ -63,7 +75,9 @@ test('1b. missing frontmatter is a violation', () => {
 
 test('2a. a reference doc with status reference passes', () => {
   const violations = run({
-    'docs/reference/contacts/smart-lists.md': doc({ title: 'Smart Lists', status: 'reference', updated: '2026-05-29' }),
+    'docs/reference/contacts/smart-lists.md': doc({
+      title: 'Smart Lists', kind: 'reference', status: 'reference', updated: '2026-05-29',
+    }),
   })
   assert.deepEqual(violations, [])
 })
@@ -75,11 +89,23 @@ test('2b. an unknown status is rejected', () => {
   assert.ok(violations.some((v) => v.field === 'status' && v.message.includes('banana')))
 })
 
-test('2c. a kind field in frontmatter is rejected — kind is derived from the path', () => {
+test('2c. a kind field that disagrees with the path is rejected', () => {
+  // `kind` used to be FORBIDDEN in frontmatter, on the argument that storing a
+  // derived value buys an assertion whose only job is to check the duplication.
+  // It is required now: a document is routinely read outside its tree — pasted
+  // into a conversation, handed to an agent as a blob — and has to say what it
+  // is. The duplication is safe because this assertion makes drift impossible.
   const violations = run({
-    'docs/engineering/x.md': doc({ title: 'X', kind: 'engineering', status: 'active', updated: '2026-08-17' }),
+    'docs/engineering/x.md': doc({ title: 'X', kind: 'plan', status: 'active', updated: '2026-08-17' }),
   })
-  assert.ok(violations.some((v) => v.field === 'kind' && v.message.includes('derived')))
+  assert.ok(violations.some((v) => v.field === 'kind' && v.message.includes('implies "engineering"')))
+})
+
+test('2d. a missing kind field is rejected', () => {
+  const violations = run({
+    'docs/engineering/x.md': doc({ title: 'X', status: 'active', updated: '2026-08-17' }),
+  })
+  assert.ok(violations.some((v) => v.field === 'kind' && /missing/.test(v.message)))
 })
 
 test('2d. status reference outside docs/reference/ is rejected', () => {
@@ -185,7 +211,7 @@ test('5c. without git, docs paths named by AGENTS.md and CLAUDE.md must exist', 
 test('6a. superseded with a live superseded_by passes', () => {
   const violations = run({
     'docs/archive/old.md': doc({
-      title: 'Old', status: 'superseded', updated: '2026-08-09',
+      title: 'Old', kind: 'archive', status: 'superseded', updated: '2026-08-09',
       superseded_by: 'docs/engineering/quality-gate.md',
     }),
     'docs/engineering/quality-gate.md': GOOD,
@@ -200,4 +226,247 @@ test('6b. superseded without superseded_by fails, and archive must be superseded
   })
   assert.ok(violations.some((v) => v.file === 'docs/archive/old.md' && v.field === 'status'))
   assert.ok(violations.some((v) => v.file === 'docs/engineering/x.md' && v.field === 'superseded_by'))
+})
+
+// ── assertions 7, 8 and 9: modules, families, evidence ────────────────────────
+
+const MODULE_CONFIG = {
+  tiers: [
+    ['modules/*/reference/', 'reference'],
+    ['modules/*/archive/', 'archive'],
+    ['modules/*/state/', 'state'],
+    ['modules/*/todo/', 'todo'],
+    ['platform/state/', 'state'],
+    ['platform/todo/', 'todo'],
+  ],
+  tierStatus: { reference: 'reference', archive: 'superseded' },
+  tierOrder: ['state', 'todo', 'reference', 'archive'],
+  indexSubdivide: [],
+  exempt: ['INDEX.md', 'README.md', 'ROADMAP.md', 'modules/*/README.md'],
+  modules: [
+    { key: 'core', class: 'core', requires: [] },
+    { key: 'crm', class: 'anchor', requires: [] },
+  ],
+  requiredFields: { state: ['verified_on', 'evidence'], todo: ['commitment', 'changes'] },
+  vocabularies: { commitment: ['committed', 'optional'] },
+}
+
+/** Fixture whose docs/ uses the module tier map. */
+function runModular(files, options) {
+  const root = fixture(
+    { ...files, 'docs-system.config.json': JSON.stringify(MODULE_CONFIG) },
+    { ...options, config: MODULE_CONFIG },
+  )
+  try {
+    clearConfigCache()
+    return checkDocs(root)
+  } finally {
+    clearConfigCache()
+    rmSync(root, { recursive: true, force: true })
+  }
+}
+
+const STATE_DOC = doc({
+  title: 'Pipelines',
+  kind: 'state',
+  module: 'crm',
+  status: 'active',
+  updated: '2026-08-23',
+  verified_on: '2026-08-23',
+  evidence: ['docs/modules/crm/state/pipelines.md'],
+})
+
+const TODO_DOC = doc({
+  title: 'Stage-change trigger',
+  kind: 'todo',
+  module: 'crm',
+  status: 'active',
+  updated: '2026-08-23',
+  commitment: 'committed',
+  changes: ['docs/modules/crm/state/pipelines.md'],
+})
+
+test('7a. a state doc whose kind and module match its path is clean', () => {
+  assert.deepEqual(runModular({ 'docs/modules/crm/state/pipelines.md': STATE_DOC }), [])
+})
+
+test('7b. a kind that disagrees with the path is a violation', () => {
+  const wrong = STATE_DOC.replace('kind: state', 'kind: todo')
+  const violations = runModular({ 'docs/modules/crm/state/pipelines.md': wrong })
+  assert.equal(violations.filter((v) => v.field === 'kind').length, 1)
+})
+
+test('7c. a module that disagrees with the path is a violation', () => {
+  const wrong = STATE_DOC.replace('module: crm', 'module: core')
+  const violations = runModular({ 'docs/modules/crm/state/pipelines.md': wrong })
+  assert.equal(violations.filter((v) => v.field === 'module').length, 1)
+})
+
+test('7d. a module outside the registry is a violation', () => {
+  const wrong = STATE_DOC.replace('module: crm', 'module: nonesuch')
+  const violations = runModular({ 'docs/modules/nonesuch/state/x.md': wrong })
+  assert.ok(violations.some((v) => v.field === 'module' && /not a registered module/.test(v.message)))
+})
+
+test('7e. a missing kind is a violation', () => {
+  const wrong = STATE_DOC.replace('kind: state\n', '')
+  const violations = runModular({ 'docs/modules/crm/state/pipelines.md': wrong })
+  assert.ok(violations.some((v) => v.field === 'kind'))
+})
+
+test('8a. a state doc with no evidence is a violation', () => {
+  const wrong = STATE_DOC.replace(/evidence:\n(  - .*\n)+/, '')
+  const violations = runModular({ 'docs/modules/crm/state/pipelines.md': wrong })
+  assert.ok(violations.some((v) => v.field === 'evidence' && /required/.test(v.message)))
+})
+
+test('8b. a state doc with an empty evidence list is a violation', () => {
+  const wrong = STATE_DOC.replace(/evidence:\n(  - .*\n)+/, 'evidence: []\n')
+  const violations = runModular({ 'docs/modules/crm/state/pipelines.md': wrong })
+  assert.ok(violations.some((v) => v.field === 'evidence'))
+})
+
+test('8c. evidence naming a file that does not exist is a violation', () => {
+  const wrong = STATE_DOC.replace('docs/modules/crm/state/pipelines.md', 'apps/api/src/nowhere.ts:24')
+  const violations = runModular({ 'docs/modules/crm/state/pipelines.md': wrong })
+  assert.ok(violations.some((v) => v.field === 'evidence' && /does not exist/.test(v.message)))
+})
+
+test('8d. evidence that is a runnable command is accepted', () => {
+  const ok = STATE_DOC.replace('"docs/modules/crm/state/pipelines.md"', '"bunx nx test domain-pipelines"')
+  assert.deepEqual(runModular({ 'docs/modules/crm/state/pipelines.md': ok }), [])
+})
+
+test('8e. evidence that is neither a path nor a command is a violation', () => {
+  const wrong = STATE_DOC.replace('"docs/modules/crm/state/pipelines.md"', '"we checked and it works"')
+  const violations = runModular({ 'docs/modules/crm/state/pipelines.md': wrong })
+  assert.ok(violations.some((v) => v.field === 'evidence' && /not a path or a command/.test(v.message)))
+})
+
+test('8f. a todo whose changes target exists and is state is clean', () => {
+  assert.deepEqual(
+    runModular({
+      'docs/modules/crm/state/pipelines.md': STATE_DOC,
+      'docs/modules/crm/todo/stage-trigger.md': TODO_DOC,
+    }),
+    [],
+  )
+})
+
+test('8g. a todo whose changes target does not exist is a violation', () => {
+  const wrong = TODO_DOC.replace('state/pipelines.md', 'state/nowhere.md')
+  const violations = runModular({
+    'docs/modules/crm/state/pipelines.md': STATE_DOC,
+    'docs/modules/crm/todo/stage-trigger.md': wrong,
+  })
+  assert.ok(violations.some((v) => v.field === 'changes' && /does not exist/.test(v.message)))
+})
+
+test('8h. a todo pointing at another todo is a violation', () => {
+  const wrong = TODO_DOC.replace('docs/modules/crm/state/pipelines.md', 'docs/modules/crm/todo/other.md')
+  const violations = runModular({
+    'docs/modules/crm/state/pipelines.md': STATE_DOC,
+    'docs/modules/crm/todo/other.md': TODO_DOC,
+    'docs/modules/crm/todo/stage-trigger.md': wrong,
+  })
+  assert.ok(violations.some((v) => v.field === 'changes' && /is kind "todo"/.test(v.message)))
+})
+
+test('8i. a commitment outside the vocabulary is a violation', () => {
+  const wrong = TODO_DOC.replace('commitment: committed', 'commitment: maybe')
+  const violations = runModular({
+    'docs/modules/crm/state/pipelines.md': STATE_DOC,
+    'docs/modules/crm/todo/stage-trigger.md': wrong,
+  })
+  assert.ok(violations.some((v) => v.field === 'commitment'))
+})
+
+test('9a. index entries carry the module', () => {
+  const root = fixture(
+    {
+      'docs/modules/crm/state/pipelines.md': STATE_DOC,
+      'docs-system.config.json': JSON.stringify(MODULE_CONFIG),
+    },
+    { withIndex: false, config: MODULE_CONFIG },
+  )
+  try {
+    clearConfigCache()
+    const entries = buildIndex(root, loadConfig(root))
+    assert.equal(entries.length, 1)
+    assert.equal(entries[0].module, 'crm')
+    assert.equal(entries[0].kind, 'state')
+    assert.equal(entries[0].verified_on, '2026-08-23')
+  } finally {
+    clearConfigCache()
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('9b. a stale module README fails the gate', () => {
+  // The README has to be corrupted AFTER the fixture generates the index —
+  // `fixture` writes the given files first and then renders every artefact over
+  // them, so a stale copy passed in as a file would be silently repaired.
+  const root = fixture(
+    {
+      'docs/modules/crm/state/pipelines.md': STATE_DOC,
+      'docs-system.config.json': JSON.stringify(MODULE_CONFIG),
+    },
+    { config: MODULE_CONFIG },
+  )
+  try {
+    writeFileSync(join(root, 'docs/modules/crm/README.md'), '# wrong\n')
+    clearConfigCache()
+    const violations = checkDocs(root)
+    assert.ok(violations.some((v) => v.file === 'docs/modules/crm/README.md' && v.field === 'index'))
+  } finally {
+    clearConfigCache()
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('9c. a module README lists its state and todo documents', () => {
+  const root = fixture(
+    {
+      'docs/modules/crm/state/pipelines.md': STATE_DOC,
+      'docs/modules/crm/todo/stage-trigger.md': TODO_DOC,
+      'docs-system.config.json': JSON.stringify(MODULE_CONFIG),
+    },
+    { withIndex: false, config: MODULE_CONFIG },
+  )
+  try {
+    clearConfigCache()
+    const rendered = new Map(renderIndex(root, loadConfig(root)))
+    const readme = rendered.get('docs/modules/crm/README.md')
+    assert.match(readme, /## Reflection/)
+    assert.match(readme, /Pipelines/)
+    assert.match(readme, /## Wishlist/)
+    assert.match(readme, /Stage-change trigger/)
+    assert.match(readme, /`anchor`/)
+  } finally {
+    clearConfigCache()
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('9d. INDEX.md subdivides by module when modules are configured', () => {
+  const config = withDerived({ ...DEFAULTS, ...MODULE_CONFIG, indexSubdivide: ['reference', 'todo'] })
+  const entries = [
+    { path: 'docs/modules/crm/todo/a.md', title: 'A', kind: 'todo', module: 'crm', status: 'active', updated: '2026-08-23' },
+    { path: 'docs/modules/store/todo/b.md', title: 'B', kind: 'todo', module: 'store', status: 'active', updated: '2026-08-23' },
+  ]
+  const markdown = renderMarkdown(entries, config)
+  assert.match(markdown, /### crm \(1\)/)
+  assert.match(markdown, /### store \(1\)/)
+})
+
+test('8j. evidence may name a path with Next.js dynamic segments', () => {
+  const ok = STATE_DOC.replace(
+    '"docs/modules/crm/state/pipelines.md"',
+    '"docs/modules/crm/state/[id]/(group)/pipelines.md:24"',
+  )
+  const violations = runModular({
+    'docs/modules/crm/state/pipelines.md': ok,
+    'docs/modules/crm/state/[id]/(group)/pipelines.md': STATE_DOC,
+  })
+  assert.deepEqual(violations.filter((v) => v.field === 'evidence'), [])
 })

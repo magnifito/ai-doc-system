@@ -12,6 +12,10 @@
     "test": "node --test scripts/*.test.mjs",
     "lint:docs": "node scripts/check-docs.mjs",
     "lint:docs:advisory": "node scripts/check-docs-advisory.mjs",
-    "gen:docs-index": "node scripts/gen-docs-index.mjs"
+    "gen:docs-index": "node scripts/gen-docs-index.mjs",
+    "fix:docs-frontmatter": "node scripts/fix-docs-frontmatter.mjs"
+  },
+  "dependencies": {
+    "yaml": "^2.5.0"
   }
 }

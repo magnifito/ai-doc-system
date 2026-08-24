@@ -5,14 +5,20 @@
  *
  * Six assertions, each of which can only fire on a real defect:
  *   1. frontmatter present and parseable on every document outside the exempt list
- *   2. closed vocabularies — `status` in its set, `title`/`updated` present, no
- *      `kind` field (kind is derived from the path), status agrees with the tier
- *      in BOTH directions, `implements` names a file that exists
+ *   2. closed vocabularies — `status` in its set, `title`/`updated` present,
+ *      status agrees with the tier in BOTH directions, `implements` names a
+ *      file that exists
  *   3. path hygiene — kebab-case directories, kebab or ALL-CAPS basenames
  *   4. index freshness — regenerate in memory, compare with what is committed
  *   5. no dead `.md` links, inside the docs tree and from every tracked file
  *      outside it
  *   6. `status: superseded` implies a `superseded_by` whose target exists
+ *   7. `kind` and `module` are PRESENT and agree with the path. They are stored
+ *      as well as derived so a document read outside its tree still says what it
+ *      is; this assertion is what makes the duplication safe
+ *   8. per-kind required fields (config.requiredFields), closed vocabularies for
+ *      optional scalars, every `evidence` entry a live path or a runnable
+ *      command, and every `changes` target a live document of kind `state`
  *
  * What it deliberately does NOT check — document age, prose style, whether
  * `code:` targets still exist, whether `updated:` matches git — is argued in
@@ -24,9 +30,33 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join, dirname, resolve, relative } from 'node:path'
 import { parseFrontmatter } from './docs-frontmatter.mjs'
 import { loadConfig } from './docs-config.mjs'
-import { isExempt, kindForPath, pathHygieneErrors, reservedStatuses, statusForKind } from './docs-taxonomy.mjs'
+import { isExempt, kindForPath, moduleForPath, pathHygieneErrors, reservedStatuses, statusForKind } from './docs-taxonomy.mjs'
 import { listDocs, repoRoot } from './docs-fs.mjs'
 import { renderIndex } from './gen-docs-index.mjs'
+
+/**
+ * Evidence entries are the one field whose VALUE the gate inspects, because an
+ * unevidenced claim is the failure this system exists to stop. An entry is
+ * either a repository path (optionally `:line` or `:line-line`), which must
+ * exist, or a command a reader can re-run. Free prose is rejected — "we checked
+ * and it works" is exactly the claim that went stale unnoticed for six months.
+ */
+// Square brackets and parentheses are ordinary path characters in a Next.js
+// tree — `app/api/booking/[calendarSlug]/route.ts`, `app/[locale]/(public)/…` —
+// so a validator that rejects them rejects real evidence.
+const EVIDENCE_PATH = /^([A-Za-z0-9._\-/[\]()@]+)(?::\d+(?:-\d+)?)?$/
+const EVIDENCE_RUNNERS = ['bun', 'bunx', 'node', 'npm', 'npx', 'grep', 'ls', 'git', 'curl', 'psql']
+
+function evidenceError(root, entry) {
+  const first = entry.trim().split(/\s+/)[0]
+  if (EVIDENCE_RUNNERS.includes(first)) return null
+  const match = entry.trim().match(EVIDENCE_PATH)
+  if (!match) {
+    return `"${entry}" is not a path or a command — start it with ${EVIDENCE_RUNNERS.join('/')} or name a file`
+  }
+  if (!existsSync(join(root, match[1]))) return `"${entry}" names ${match[1]}, which does not exist`
+  return null
+}
 
 /**
  * @param {string} root repo root
@@ -34,6 +64,7 @@ import { renderIndex } from './gen-docs-index.mjs'
  */
 export function checkDocs(root, config = loadConfig(root)) {
   const violations = []
+  const changeTargets = []
   const add = (file, field, message) => violations.push({ file, field, message })
   const reserved = reservedStatuses(config)
 
@@ -44,7 +75,7 @@ export function checkDocs(root, config = loadConfig(root)) {
     if (isExempt(config, path)) continue
 
     const source = readFileSync(join(root, path), 'utf8')
-    const { data, body, present } = parseFrontmatter(source)
+    const { data, body, present, error } = parseFrontmatter(source)
 
     // 1. frontmatter present
     if (!present) {
@@ -52,17 +83,43 @@ export function checkDocs(root, config = loadConfig(root)) {
       continue
     }
 
+    if (error) {
+      add(path, 'frontmatter', `is not valid YAML — ${error}`)
+      continue
+    }
+
     // 2. closed vocabularies, and status agrees with the tier
     for (const field of ['title', 'status', 'updated']) {
       if (!data[field]) add(path, field, 'required field is missing or empty')
     }
-    if (data.kind) {
-      add(path, 'kind', 'kind is derived from the path — remove this field')
+
+    // 7. `kind` and `module` are stored AND derived, and must agree. The
+    // duplication is deliberate: a document is often read outside its tree, so
+    // it has to say what it is. This assertion is what makes drift impossible.
+    const pathKind = kindForPath(config, path)
+    const pathModule = moduleForPath(config, path)
+
+    if (!data.kind) add(path, 'kind', 'required field is missing or empty')
+    else if (pathKind === null) {
+      add(path, 'kind', `is "${data.kind}" but this path is under no tier — move the file`)
+    } else if (data.kind !== pathKind) {
+      add(path, 'kind', `is "${data.kind}" but its path implies "${pathKind}" — set kind: ${pathKind}`)
+    }
+
+    if (config.modules.length > 0) {
+      if (!data.module) add(path, 'module', 'required field is missing or empty')
+      else if (!config.moduleKeys.includes(data.module)) {
+        add(path, 'module', `"${data.module}" is not a registered module — one of ${config.moduleKeys.join(' | ')}`)
+      } else if (pathModule === null) {
+        add(path, 'module', `is "${data.module}" but this path is in no module tree — move the file`)
+      } else if (data.module !== pathModule) {
+        add(path, 'module', `is "${data.module}" but its path implies "${pathModule}" — set module: ${pathModule}`)
+      }
     }
     if (data.status && !config.statuses.includes(data.status)) {
       add(path, 'status', `"${data.status}" is not one of ${config.statuses.join(' | ')}`)
     }
-    const tier = kindForPath(config, path)
+    const tier = pathKind
     const forced = statusForKind(config, tier)
     if (forced && data.status && data.status !== forced) {
       add(path, 'status', `is "${data.status}" but everything under ${config.docsDir}/${tierPrefix(config, tier)} is status: ${forced}`)
@@ -73,6 +130,36 @@ export function checkDocs(root, config = loadConfig(root)) {
     }
     if (data.updated && !/^\d{4}-\d{2}-\d{2}$/.test(data.updated)) {
       add(path, 'updated', `"${data.updated}" is not an ISO date`)
+    }
+
+    // 8. per-kind required fields. Which kind demands what is configuration,
+    // not a constant here, so three repositories can share this script.
+    for (const field of config.requiredFields[pathKind] ?? []) {
+      const value = data[field]
+      if (value == null || value === '' || (Array.isArray(value) && value.length === 0)) {
+        add(path, field, `required on kind: ${pathKind}`)
+      }
+    }
+
+    // 8a. closed vocabularies for optional scalars (commitment).
+    for (const [field, allowed] of Object.entries(config.vocabularies)) {
+      if (data[field] && !allowed.includes(data[field])) {
+        add(path, field, `"${data[field]}" is not one of ${allowed.join(' | ')}`)
+      }
+    }
+
+    // 8b. evidence entries are paths that exist, or commands.
+    if (Array.isArray(data.evidence)) {
+      for (const entry of data.evidence) {
+        const message = evidenceError(root, entry)
+        if (message) add(path, 'evidence', message)
+      }
+    }
+
+    // 8c. `changes` names state documents. Deferred to a second pass because it
+    // needs every document's kind, and this loop has only seen part of the tree.
+    if (Array.isArray(data.changes)) {
+      for (const target of data.changes) changeTargets.push({ path, target })
     }
 
     // 2b. `implements` is optional, but when present its file half must exist
@@ -97,6 +184,19 @@ export function checkDocs(root, config = loadConfig(root)) {
         ? target
         : relative(root, resolve(join(root, dirname(path)), target)).split(/[\\/]/).join('/')
       if (!existsCaseExact(root, resolved)) add(path, 'link', `dead link -> ${target}`)
+    }
+  }
+
+  // 8c, second pass. A `changes` target must exist AND be a reflection document;
+  // a todo pointing at another todo describes no reality and can never close.
+  for (const { path, target } of changeTargets) {
+    if (!existsCaseExact(root, target)) {
+      add(path, 'changes', `points at "${target}", which does not exist`)
+      continue
+    }
+    const targetKind = kindForPath(config, target)
+    if (targetKind !== 'state') {
+      add(path, 'changes', `points at "${target}", which is kind "${targetKind ?? 'none'}" — changes must name state documents`)
     }
   }
 
