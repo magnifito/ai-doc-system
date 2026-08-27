@@ -21,14 +21,16 @@
  *
  * Derivation rules for the frontmatter it stamps:
  *   title    first `# ` heading, else the destination's filename stem
+ *   kind     what the DESTINATION path implies — stamped here so the gate's
+ *            kind/module assertion passes on the migration commit itself
+ *   module   same, when the project declares modules
  *   status   the tier's forced status (config.tierStatus) when it has one,
  *            else `defaultStatus` from the map, else `active`
  *   updated  git log -1 for the file
  *
- * A file that ALREADY has frontmatter keeps its block; only missing required
- * fields are appended to it. Never rewrite a block this minimal parser cannot
- * fully represent — the two-line reader in docs-frontmatter.mjs cannot read
- * lists or nested keys, and must not destroy them.
+ * A file that ALREADY has frontmatter keeps its block verbatim; only missing
+ * required fields are appended to it. The block is never re-rendered from
+ * parsed data — values the parser flattens (nested keys) must not be destroyed.
  */
 import { execFileSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
@@ -36,7 +38,7 @@ import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { firstHeading, parseFrontmatter, renderFrontmatter } from './docs-frontmatter.mjs'
 import { loadConfig } from './docs-config.mjs'
-import { kindForPath, normalizeSegment, slugify, statusForKind } from './docs-taxonomy.mjs'
+import { kindForPath, moduleForPath, normalizeSegment, slugify, statusForKind } from './docs-taxonomy.mjs'
 import { lastCommitDate, listDocs, repoRoot } from './docs-fs.mjs'
 
 const DEFAULT_MAP = 'docs-migration.map.mjs'
@@ -77,8 +79,8 @@ function statusFor(config, map, destination) {
 /** Preserve an existing frontmatter block; append only the missing required fields. */
 function stampedContent(parsed, meta, body) {
   if (!parsed.present) return renderFrontmatter(meta) + body.replace(/^\n+/, '\n')
-  const missing = ['title', 'status', 'updated']
-    .filter((key) => !parsed.data[key])
+  const missing = ['title', 'kind', 'module', 'status', 'updated']
+    .filter((key) => meta[key] && !parsed.data[key])
     .map((key) => `${key}: ${meta[key]}`)
   return `---\n${[parsed.raw, ...missing].join('\n')}\n---\n${body.replace(/^\n+/, '\n')}`
 }
@@ -165,8 +167,14 @@ async function main() {
       continue
     }
     const parsed = parseFrontmatter(readFileSync(join(root, path), 'utf8'))
+    const kind = kindForPath(config, destination)
+    const moduleKey = config.modules.length > 0 ? moduleForPath(config, destination) : null
     const meta = {
       title: parsed.data.title ?? firstHeading(parsed.body) ?? destination.split('/').pop().replace(/\.md$/, ''),
+      // Derived from the DESTINATION: the gate requires both fields and asserts
+      // they agree with the path, so the migration commit must pass on its own.
+      ...(kind ? { kind } : {}),
+      ...(moduleKey ? { module: moduleKey } : {}),
       status: parsed.data.status ?? statusFor(config, map, destination),
       updated: parsed.data.updated ?? lastCommitDate(root, path),
       ...(parsed.data.implements ? { implements: parsed.data.implements } : {}),

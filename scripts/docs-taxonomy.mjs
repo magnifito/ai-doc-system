@@ -4,9 +4,10 @@
  * (docs-config.mjs) rather than reading module-level constants, so one checkout
  * can serve several projects.
  *
- * A document's kind is DERIVED from its path — it is never a frontmatter field.
- * Storing it twice would buy one whole assertion class whose only job is to
- * check the duplication; deriving it deletes both.
+ * A document's kind is DERIVED from its path, and ALSO stored in frontmatter so
+ * a document read outside its tree still says what it is. The gate asserts the
+ * two agree, which is what makes the duplication safe (see the design's §4.1
+ * reversal note). These functions compute the path-derived half.
  */
 
 /**

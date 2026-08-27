@@ -303,8 +303,10 @@ one.**
 
 1. **Frontmatter present and parseable** on every `.md` under the docs tree, except the exempt files.
 2. **Closed vocabularies.** `status` is a member of its closed set; `title` and `updated` are present;
-   a `kind:` field is rejected; status agrees with the tier in both directions (§4.3); an
-   `implements:` field, when present, names a file that exists.
+   `kind` (and `module`, when modules are declared) is present and agrees with what the path implies
+   (§4.1's reversal note); dates are ISO-formatted; status agrees with the tier in both directions
+   (§4.3); an `implements:` field, when present, names a file that exists. Per-kind required fields
+   and the `evidence`/`changes` value checks are §4.2a.
 3. **Path hygiene, and naming.** Two rules that are easy to confuse, and the second one is the one
    most trees are missing.
 
@@ -334,7 +336,9 @@ one.**
    generated file. The index is sorted in plain codepoint order — never `localeCompare`, which is
    ICU/locale-dependent and would make "byte-identical" mean different things on different machines.
 5. **No dead links, inside docs and out.**
-   - Every Markdown link in a doc body whose target is a `.md` file resolves to a file that exists.
+   - Every Markdown link in a doc body whose target is a `.md` file — inline or a reference-style
+     definition — resolves to a file that exists, with every path segment matched case-exactly
+     against the real directory listing.
    - Every root-relative docs path in a **tracked file outside the docs tree** — `CLAUDE.md`,
      `AGENTS.md`, source comments, workflows, scripts — resolves too, via one `git grep`. Vendored
      tooling trees are excluded, because their skill templates name generic `docs/` paths that are
@@ -343,6 +347,9 @@ one.**
      *inside* the docs tree are deliberately unchecked: historical plans legitimately narrate old
      paths.
 6. **`status: superseded` implies a `superseded_by:` whose target exists.**
+7. **No two documents in one tier (and module) share a basename**, sentinels excepted. The naming
+   rule of assertion 3 stops the same name in two casings; this stops it verbatim — two `foo.md`
+   in one tier is the duplicate-topic-tree defect coming back.
 
 ### 5.3 What it deliberately does not assert
 
@@ -368,7 +375,8 @@ inside the gate; regenerating the index is a separate, explicitly invoked comman
 
 The suite ships in the same change and is **wired into the gate as a blocking step**, because a suite
 no runner executes is green exactly once. It uses `node:test` rather than a project's test framework,
-so the scripts stay dependency-free and portable between repositories.
+so the scripts stay portable between repositories — their only dependency is the `yaml` package,
+which the host must install.
 
 Fixtures are throwaway trees. Most are not git repositories, which exercises the non-git fallback of
 the tracked-reference scan; a separate file builds real git fixtures, which is the only way to cover
@@ -436,6 +444,10 @@ Stated so they are not mistaken for solved problems.
 5. **`updated:` will drift** when a file is edited without the field being bumped. Nothing blocks on
    this, by design (§4.6) — the advisory report is the only detector.
 
+6. **The evidence check validates form, not truth.** An entry starting with a known runner passes as
+   a "command" whatever follows it; nothing executes it or verifies the claim. The check stops
+   free prose, which is where unevidenced claims hide — it cannot stop a lie that names a real file.
+
 ---
 
 ## 8. Deliverables
@@ -471,6 +483,6 @@ Three earlier questions were resolved once and need not be reopened:
    "Required" was unenforceable honestly: a migration cannot derive it without inventing values.
 5. ~~Where should the test suite live?~~ **Blocking, next to `lint:docs`.** Least machinery; the
    absence of precedent was the absence of tested scripts, not an argument.
-6. ~~Does `reference` need a `rejected` sibling?~~ **No.** With `kind` gone from frontmatter,
-   `status: reference` is the only marker on those files and stays flat. If the idea bank ever needs
+6. ~~Does `reference` need a `rejected` sibling?~~ **No.** With `kind` mirroring the path,
+   `status: reference` is the only independent marker on those files and stays flat. If the idea bank ever needs
    triage, that is a new optional field (`disposition: rejected`), not a fork of the lifecycle enum.

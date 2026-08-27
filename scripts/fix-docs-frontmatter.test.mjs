@@ -44,11 +44,50 @@ test('stamps kind and module from the path, preserving lists', () => {
     const written = readFileSync(join(root, 'docs/modules/crm/state/pipelines.md'), 'utf8')
     assert.match(written, /kind: state/)
     assert.match(written, /module: crm/)
-    // The renderer quotes only what YAML would otherwise read differently, so a
-    // command with no colon comes back bare. That is deterministic, which is
-    // what index freshness needs.
-    assert.match(written, /evidence:\n {2}- bunx nx test domain-pipelines/)
+    // The untouched lines survive byte-verbatim — quoting included. A restamp
+    // patches the two derived fields and re-renders nothing else.
+    assert.match(written, /evidence:\n {2}- "bunx nx test domain-pipelines"/)
     assert.match(written, /# Pipelines/)
+  } finally {
+    clearConfigCache()
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('a restamp preserves frontmatter it cannot represent', () => {
+  // The parser flattens a nested map to a string; a restamp that re-rendered
+  // the whole block from parsed data would write "[object Object]" over it.
+  const root = fixture({
+    'docs/modules/crm/state/pipelines.md':
+      '---\ntitle: Pipelines\nkind: todo\nmodule: core\nstatus: active\nupdated: 2026-08-23\n' +
+      'verified_on: 2026-08-23\nevidence:\n  - "bunx nx test domain-pipelines"\n' +
+      'meta:\n  owner: kirov\n  depth: 2\n---\n\n# Pipelines\n',
+  })
+  try {
+    const changed = fixFrontmatter(root, loadConfig(root))
+    assert.equal(changed.length, 1)
+    const written = readFileSync(join(root, 'docs/modules/crm/state/pipelines.md'), 'utf8')
+    assert.match(written, /kind: state/)
+    assert.match(written, /module: crm/)
+    assert.match(written, /meta:\n {2}owner: kirov\n {2}depth: 2/)
+    assert.doesNotMatch(written, /object Object/)
+  } finally {
+    clearConfigCache()
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('a missing kind is inserted, not only corrected', () => {
+  const root = fixture({
+    'docs/modules/crm/state/pipelines.md':
+      '---\ntitle: Pipelines\nstatus: active\nupdated: 2026-08-23\n' +
+      'verified_on: 2026-08-23\nevidence:\n  - "bunx nx test domain-pipelines"\n---\n\n# Pipelines\n',
+  })
+  try {
+    const changed = fixFrontmatter(root, loadConfig(root))
+    assert.equal(changed.length, 1)
+    const written = readFileSync(join(root, 'docs/modules/crm/state/pipelines.md'), 'utf8')
+    assert.match(written, /title: Pipelines\nkind: state\nmodule: crm\n/)
   } finally {
     clearConfigCache()
     rmSync(root, { recursive: true, force: true })

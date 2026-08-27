@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * ADVISORY documentation checks — reported, never blocking. Runs as part of
- * `bun run verify:extras` and always exits 0.
+ * ADVISORY documentation checks — reported, never blocking. Wire it wherever
+ * the host project keeps its non-blocking checks; it always exits 0.
  *
  * Two things the blocking gate deliberately refuses to assert (design section 5.3
  * — github.com/magnifito/ai-doc-system), because either one would fail a push for

@@ -7,9 +7,9 @@
  * Run: node --test scripts/check-docs.test.mjs
  *
  * Uses `node:test` rather than a project's own test framework deliberately — see
- * the design's section 5.5 (github.com/magnifito/ai-doc-system): the scripts stay
- * dependency-free and portable, and the suite is wired into the host project's
- * blocking gate next to `lint:docs`.
+ * the design's section 5.5 (github.com/magnifito/ai-doc-system): the scripts need
+ * only Node plus the `yaml` package, and the suite is wired into the host
+ * project's blocking gate next to `lint:docs`.
  */
 import { strict as assert } from 'node:assert'
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
@@ -172,6 +172,17 @@ test('3b. spaces, ampersands, MixedCase and underscores are rejected', () => {
   assert.ok(paths.length >= 3)
 })
 
+test('3e. a link through a wrong-case directory segment is dead', () => {
+  // existsSync resolves `../Engineering/d.md` on macOS and Windows; the tree
+  // then breaks only on Linux. Every segment must match the real listing.
+  const violations = run({
+    'docs/engineering/a.md': doc({ title: 'A', kind: 'engineering', status: 'active', updated: '2026-08-17' }) +
+      '[d](../Engineering/d.md)\n',
+    'docs/engineering/d.md': doc({ title: 'D', kind: 'engineering', status: 'active', updated: '2026-08-17' }),
+  })
+  assert.equal(violations.filter((v) => v.field === 'link').length, 1)
+})
+
 test('4a. a freshly generated index is accepted', () => {
   assert.deepEqual(run({ 'docs/engineering/quality-gate.md': GOOD }).filter((v) => v.field === 'index'), [])
 })
@@ -196,6 +207,14 @@ test('5b. dead relative and root-relative links fail; external links are ignored
       '[gone](./gone.md) [also gone](docs/product/gone.md) [ext](https://example.com/x.md)\n',
   })
   assert.equal(violations.filter((v) => v.field === 'link').length, 2)
+})
+
+test('5d. a dead reference-style link definition fails', () => {
+  const violations = run({
+    'docs/engineering/a.md': doc({ title: 'A', kind: 'engineering', status: 'active', updated: '2026-08-17' }) +
+      'See [gone][g].\n\n[g]: ./gone.md\n',
+  })
+  assert.equal(violations.filter((v) => v.field === 'link').length, 1)
 })
 
 test('5c. without git, docs paths named by AGENTS.md and CLAUDE.md must exist', () => {
@@ -457,6 +476,32 @@ test('9d. INDEX.md subdivides by module when modules are configured', () => {
   const markdown = renderMarkdown(entries, config)
   assert.match(markdown, /### crm \(1\)/)
   assert.match(markdown, /### store \(1\)/)
+})
+
+test('8k. verified_on must be an ISO date when present', () => {
+  const wrong = STATE_DOC.replace('verified_on: 2026-08-23', 'verified_on: yesterday')
+  const violations = runModular({ 'docs/modules/crm/state/pipelines.md': wrong })
+  assert.ok(violations.some((v) => v.field === 'verified_on' && /ISO date/.test(v.message)))
+})
+
+test('10a. two files with the same basename in one tier is a violation', () => {
+  const ref = (title) => doc({ title, kind: 'reference', status: 'reference', updated: '2026-05-29' })
+  const violations = run({
+    'docs/reference/a/foo.md': ref('A foo'),
+    'docs/reference/b/foo.md': ref('B foo'),
+  })
+  const dups = violations.filter((v) => v.field === 'basename')
+  assert.equal(dups.length, 1)
+  assert.match(dups[0].message, /docs\/reference\/a\/foo\.md/)
+})
+
+test('10b. sentinels may repeat across areas of one tier', () => {
+  const ref = (title) => doc({ title, kind: 'reference', status: 'reference', updated: '2026-05-29' })
+  const violations = run({
+    'docs/reference/a/PRD.md': ref('A'),
+    'docs/reference/b/PRD.md': ref('B'),
+  })
+  assert.deepEqual(violations.filter((v) => v.field === 'basename'), [])
 })
 
 test('8j. evidence may name a path with Next.js dynamic segments', () => {

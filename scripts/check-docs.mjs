@@ -3,7 +3,7 @@
  * The blocking documentation gate. Wire it into the host project's quality gate
  * as `lint:docs`.
  *
- * Six assertions, each of which can only fire on a real defect:
+ * Nine assertions, each of which can only fire on a real defect:
  *   1. frontmatter present and parseable on every document outside the exempt list
  *   2. closed vocabularies — `status` in its set, `title`/`updated` present,
  *      status agrees with the tier in BOTH directions, `implements` names a
@@ -19,6 +19,8 @@
  *   8. per-kind required fields (config.requiredFields), closed vocabularies for
  *      optional scalars, every `evidence` entry a live path or a runnable
  *      command, and every `changes` target a live document of kind `state`
+ *   9. no two documents in one tier (and module) share a basename — the naming
+ *      rule stops the same name in two CASINGS; this stops it verbatim
  *
  * What it deliberately does NOT check — document age, prose style, whether
  * `code:` targets still exist, whether `updated:` matches git — is argued in
@@ -65,6 +67,7 @@ function evidenceError(root, entry) {
 export function checkDocs(root, config = loadConfig(root)) {
   const violations = []
   const changeTargets = []
+  const basenames = new Map()
   const add = (file, field, message) => violations.push({ file, field, message })
   const reserved = reservedStatuses(config)
 
@@ -116,6 +119,18 @@ export function checkDocs(root, config = loadConfig(root)) {
         add(path, 'module', `is "${data.module}" but its path implies "${pathModule}" — set module: ${pathModule}`)
       }
     }
+    // 9. duplicate basenames within one tier and module. The naming half of
+    // assertion 3 stops the same name in two casings; this stops it verbatim —
+    // two `foo.md` in one tier is the duplicate-tree defect coming back.
+    // Sentinels repeat by design (a README per area is their whole point).
+    const base = path.split('/').pop()
+    if (pathKind !== null && !config.sentinels.includes(base.replace(/\.md$/, ''))) {
+      const key = `${pathKind}|${pathModule ?? ''}|${base.toLowerCase()}`
+      const prior = basenames.get(key)
+      if (prior) add(path, 'basename', `duplicate basename in one tier — ${prior} has the same name; rename one`)
+      else basenames.set(key, path)
+    }
+
     if (data.status && !config.statuses.includes(data.status)) {
       add(path, 'status', `"${data.status}" is not one of ${config.statuses.join(' | ')}`)
     }
@@ -130,6 +145,9 @@ export function checkDocs(root, config = loadConfig(root)) {
     }
     if (data.updated && !/^\d{4}-\d{2}-\d{2}$/.test(data.updated)) {
       add(path, 'updated', `"${data.updated}" is not an ISO date`)
+    }
+    if (data.verified_on && !/^\d{4}-\d{2}-\d{2}$/.test(data.verified_on)) {
+      add(path, 'verified_on', `"${data.verified_on}" is not an ISO date`)
     }
 
     // 8. per-kind required fields. Which kind demands what is configuration,
@@ -213,7 +231,7 @@ export function checkDocs(root, config = loadConfig(root)) {
   // 4. index freshness — regenerate in memory, compare with what is committed
   for (const [path, content] of renderIndex(root, config)) {
     const current = existsSync(join(root, path)) ? readFileSync(join(root, path), 'utf8') : null
-    if (current !== content) add(path, 'index', 'stale — run `bun run gen:docs-index`')
+    if (current !== content) add(path, 'index', 'stale — run `node scripts/gen-docs-index.mjs`')
   }
 
   return violations
@@ -222,17 +240,22 @@ export function checkDocs(root, config = loadConfig(root)) {
 /**
  * `existsSync` with the case checked, because macOS and Windows resolve
  * `./FOO.md` to `foo.md` and would report a link as live after the file was
- * renamed. The same tree then fails on Linux. Reads the parent directory and
- * requires the basename verbatim.
+ * renamed. The same tree then fails on Linux. EVERY segment is checked against
+ * its parent's real listing — a wrong-case directory in the middle of a link
+ * is the same defect as a wrong-case basename.
  */
 function existsCaseExact(root, repoRelative) {
-  const full = join(root, repoRelative)
-  if (!existsSync(full)) return false
-  try {
-    return readdirSync(dirname(full)).includes(repoRelative.split('/').pop())
-  } catch {
-    return false
+  if (!existsSync(join(root, repoRelative))) return false
+  let dir = root
+  for (const segment of repoRelative.split('/')) {
+    try {
+      if (!readdirSync(dir).includes(segment)) return false
+    } catch {
+      return false
+    }
+    dir = join(dir, segment)
   }
+  return true
 }
 
 /** The configured path prefix of a tier kind, for error messages. */
@@ -241,17 +264,21 @@ function tierPrefix(config, kind) {
 }
 
 /**
- * `.md` targets of inline Markdown links: relative or root-relative `<docsDir>/...`.
- * Skips http(s), mailto, anchors and absolute paths.
+ * `.md` targets of Markdown links: inline `[x](target)` and reference-style
+ * definitions `[ref]: target` (checked at the definition, which covers every
+ * use of the reference). Relative or root-relative `<docsDir>/...` only —
+ * http(s), mailto, anchors and absolute paths are skipped.
  */
 function markdownLinks(body) {
   const out = []
-  for (const match of body.matchAll(/\[[^\]]*\]\(([^)\s]+)\)/g)) {
-    const target = match[1].split('#')[0]
-    if (!target || !target.endsWith('.md')) continue
-    if (/^([a-z]+:)?\/\//i.test(target) || target.startsWith('mailto:') || target.startsWith('/')) continue
+  const push = (raw) => {
+    const target = raw.split('#')[0]
+    if (!target || !target.endsWith('.md')) return
+    if (/^([a-z]+:)?\/\//i.test(target) || target.startsWith('mailto:') || target.startsWith('/')) return
     out.push(target)
   }
+  for (const match of body.matchAll(/\[[^\]]*\]\(([^)\s]+)\)/g)) push(match[1])
+  for (const match of body.matchAll(/^\[[^\]]+\]:[ \t]+(\S+)/gm)) push(match[1])
   return out
 }
 

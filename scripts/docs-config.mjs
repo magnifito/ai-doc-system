@@ -148,9 +148,10 @@ export function loadConfig(root) {
     } catch (error) {
       throw new Error(`${CONFIG_FILE} is not valid JSON: ${error.message}`, { cause: error })
     }
-    validate(overrides)
   }
-  const config = withDerived({ ...DEFAULTS, ...overrides })
+  const merged = { ...DEFAULTS, ...overrides }
+  validate(overrides, merged)
+  const config = withDerived(merged)
   cache.set(root, config)
   return config
 }
@@ -175,54 +176,58 @@ export function clearConfigCache() {
   cache.clear()
 }
 
-function validate(overrides) {
+/**
+ * Cross-field rules run on the MERGED config, not the overrides alone: a
+ * project overriding `statuses` without `tierStatus` used to slip past the
+ * consistency check and fail later, one violation per document, with no hint
+ * that the config was the defect.
+ */
+function validate(overrides, merged) {
   for (const key of Object.keys(overrides)) {
     if (!(key in DEFAULTS)) {
       throw new Error(`${CONFIG_FILE}: unknown key "${key}" — known keys are ${Object.keys(DEFAULTS).join(', ')}`)
     }
   }
-  if (overrides.tiers) {
-    for (const entry of overrides.tiers) {
-      if (!Array.isArray(entry) || entry.length !== 2) {
-        throw new Error(`${CONFIG_FILE}: every "tiers" entry must be a [prefix, kind] pair`)
-      }
-      if (!entry[0].endsWith('/')) {
-        throw new Error(`${CONFIG_FILE}: tier prefix "${entry[0]}" must end with "/"`)
-      }
+  for (const entry of merged.tiers) {
+    if (!Array.isArray(entry) || entry.length !== 2) {
+      throw new Error(`${CONFIG_FILE}: every "tiers" entry must be a [prefix, kind] pair`)
+    }
+    if (!entry[0].endsWith('/')) {
+      throw new Error(`${CONFIG_FILE}: tier prefix "${entry[0]}" must end with "/"`)
     }
   }
-  if (overrides.tierStatus && overrides.statuses) {
-    for (const status of Object.values(overrides.tierStatus)) {
-      if (!overrides.statuses.includes(status)) {
-        throw new Error(`${CONFIG_FILE}: tierStatus names "${status}", which is not in "statuses"`)
-      }
+  for (const status of Object.values(merged.tierStatus)) {
+    if (!merged.statuses.includes(status)) {
+      throw new Error(`${CONFIG_FILE}: tierStatus names "${status}", which is not in "statuses"`)
     }
   }
   const CLASSES = ['core', 'anchor', 'addon']
-  if (overrides.modules) {
-    const keys = new Set(overrides.modules.map((entry) => entry.key))
-    for (const entry of overrides.modules) {
-      if (!entry.key) throw new Error(`${CONFIG_FILE}: every "modules" entry needs a "key"`)
-      if (!CLASSES.includes(entry.class)) {
+  const keys = new Set(merged.modules.map((entry) => entry.key))
+  for (const entry of merged.modules) {
+    if (!entry.key) throw new Error(`${CONFIG_FILE}: every "modules" entry needs a "key"`)
+    if (!CLASSES.includes(entry.class)) {
+      throw new Error(
+        `${CONFIG_FILE}: module "${entry.key}" has class "${entry.class}" — expected ${CLASSES.join(' | ')}`,
+      )
+    }
+    for (const required of entry.requires ?? []) {
+      if (!keys.has(required)) {
         throw new Error(
-          `${CONFIG_FILE}: module "${entry.key}" has class "${entry.class}" — expected ${CLASSES.join(' | ')}`,
+          `${CONFIG_FILE}: module "${entry.key}" requires "${required}", which is not a registered module`,
         )
-      }
-      for (const required of entry.requires ?? []) {
-        if (!keys.has(required)) {
-          throw new Error(
-            `${CONFIG_FILE}: module "${entry.key}" requires "${required}", which is not a registered module`,
-          )
-        }
       }
     }
   }
-  if (overrides.requiredFields) {
-    const kinds = new Set((overrides.tiers ?? DEFAULTS.tiers).map(([, kind]) => kind))
-    for (const kind of Object.keys(overrides.requiredFields)) {
-      if (!kinds.has(kind)) {
-        throw new Error(`${CONFIG_FILE}: requiredFields names kind "${kind}", which no tier produces`)
-      }
+  if (merged.modules.length > 0 && !merged.tiers.some(([prefix]) => prefix.startsWith(merged.moduleRoot))) {
+    throw new Error(
+      `${CONFIG_FILE}: modules are declared but no tier prefix lies under moduleRoot "${merged.moduleRoot}" — ` +
+        `add wildcard tiers like "${merged.moduleRoot}*/state/"`,
+    )
+  }
+  const kinds = new Set(merged.tiers.map(([, kind]) => kind))
+  for (const kind of Object.keys(merged.requiredFields)) {
+    if (!kinds.has(kind)) {
+      throw new Error(`${CONFIG_FILE}: requiredFields names kind "${kind}", which no tier produces`)
     }
   }
 }

@@ -49,7 +49,8 @@ Ask the user four questions and treat the answers as constraints, not suggestion
 ## 2. Install the scripts
 
 Copy `scripts/*.mjs` into the target repo's `scripts/` (or wherever its tooling lives). They are
-dependency-free ESM and need only Node.
+plain ESM, Node 20+, with one dependency: add `yaml` to the target's dependencies (`npm install
+yaml`, or the host's package manager equivalent) — without it every script fails on import.
 
 If the target's answers differ from the defaults, write `docs-system.config.json` at its root —
 `docsDir`, `tiers`, `statuses`, `tierStatus`, `exempt`, `tierOrder`, `indexSubdivide`,
@@ -99,7 +100,9 @@ Then, in this order:
 - **Nothing in `reference/` may be implemented directly.** Promote it first — `git mv` into
   `product/`, restatus, and **rewrite the prose to describe this product**. Promoting a captured
   document verbatim is how someone else's assumptions become your requirements.
-- **`kind` is derived from the path, never stored.** Moving a file between tiers is what changes it.
+- **`kind` and `module` are derived from the path AND stored, and the gate asserts they agree.**
+  Moving a file between tiers changes what the path implies; run `fix-docs-frontmatter.mjs` after
+  any move to restamp both fields. (The migration stamps them itself.)
 - **`INDEX.md` and `index.json` are generated.** Fix a stale one with `gen:docs-index`, never by hand.
 - **`updated:` is human-maintained** — the author of a substantive edit bumps it. Nothing derives it
   from git, because the git date moves on every whitespace commit.

@@ -113,6 +113,20 @@ test('tierStatus naming a status outside the vocabulary is rejected', () => {
   })
 })
 
+test('overriding statuses alone is validated against the merged tierStatus', () => {
+  // The default tierStatus still names `reference` and `superseded`; a statuses
+  // override that drops them leaves the merged config inconsistent.
+  withFixture({}, { statuses: ['active'] }, (root) => {
+    assert.throws(() => loadConfig(root), /not in "statuses"/)
+  })
+})
+
+test('modules without any tier under moduleRoot are rejected', () => {
+  withFixture({}, { modules: [{ key: 'crm', class: 'anchor', requires: [] }] }, (root) => {
+    assert.throws(() => loadConfig(root), /moduleRoot/)
+  })
+})
+
 test('a malformed config file names itself in the error', () => {
   withFixture({}, '{ not json', (root) => {
     assert.throws(() => loadConfig(root), new RegExp(CONFIG_FILE))

@@ -5,7 +5,8 @@ Topic is the second level, inside each tier.
 
 **Agents: read [`index.json`](index.json) first and filter by `kind` and `status`. Never grep this
 tree blind.** [`INDEX.md`](INDEX.md) is the same data for humans. Both are generated — run
-`bun run gen:docs-index` after adding, moving or restatusing a document; never hand-edit them.
+`node scripts/gen-docs-index.mjs` after adding, moving or restatusing a document; never hand-edit
+them.
 
 ## The tiers
 
@@ -17,8 +18,9 @@ tree blind.** [`INDEX.md`](INDEX.md) is the same data for humans. Both are gener
 | `plans/` | `plan` | Work in flight. Group the tier however the project's work is grouped; `plans/done/` is where a plan goes when it genuinely closes. |
 | `archive/` | `archive` | Replaced. Everything here is `status: superseded` and names its replacement. |
 
-`kind` is **derived from the path** and is never a frontmatter field. Moving a file between tiers
-is what changes its kind — one `git mv`, no second edit to forget.
+`kind` is **derived from the path and also stored in frontmatter**; the gate rejects a document
+where the two disagree. Moving a file between tiers changes what the path implies — `git mv`, then
+`node scripts/fix-docs-frontmatter.mjs` to restamp the stored copy.
 
 ## Frontmatter
 
@@ -28,6 +30,7 @@ Every `.md` under `docs/` carries a YAML block. The only exemptions are this fil
 ```yaml
 ---
 title: Recurring Invoices   # required
+kind: reference             # required — must equal what the path implies
 status: reference           # required — reference | draft | active | shipped | superseded
 updated: 2026-05-29         # required — ISO date, bumped by the author of a substantive edit
 ---
@@ -57,12 +60,13 @@ reference/   →   product/    →   plans/   →   plans/done/
 
 ## The gate
 
-`bun run lint:docs` (`scripts/check-docs.mjs`) is a blocking step of `bun run verify`. It asserts
-frontmatter is present and valid, that status agrees with the tier, that paths are kebab-case (or
-ALL-CAPS basenames), that the generated index is fresh, that no Markdown link to a `.md` file is
-dead — inside `docs/` and from every tracked file outside it — and that `superseded` names a live
-replacement. `bun run test:scripts` runs its tests. Advisory-only drift reports (`code:` pointers,
-`updated:` versus git) live in `bun run verify:extras`.
+The `lint:docs` script (`scripts/check-docs.mjs`) is a blocking step of this project's quality
+gate. It asserts frontmatter is present and valid, that `kind` agrees with the path, that status
+agrees with the tier, that paths are kebab-case (or ALL-CAPS basenames), that no two documents in
+one tier share a basename, that the generated index is fresh, that no Markdown link to a `.md` file
+is dead — inside `docs/` and from every tracked file outside it — and that `superseded` names a
+live replacement. The `test:scripts` script runs its tests. Advisory-only drift reports (`code:`
+pointers, `updated:` versus git) live in `check-docs-advisory.mjs`.
 
 The system this tree implements is `ai-doc-system` — design and rationale in that repository's
 `reference/design.md`.

@@ -1,6 +1,6 @@
 /** Filesystem and git helpers shared by the docs scripts. */
 import { execFileSync } from 'node:child_process'
-import { existsSync, readdirSync, statSync } from 'node:fs'
+import { existsSync, readdirSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { loadConfig } from './docs-config.mjs'
 
@@ -8,7 +8,11 @@ export function repoRoot() {
   return execFileSync('git', ['rev-parse', '--show-toplevel'], { encoding: 'utf8' }).trim()
 }
 
-/** Every `.md` under the configured docs directory, repo-relative, POSIX, sorted. */
+/**
+ * Every `.md` under the configured docs directory, repo-relative, POSIX, sorted.
+ * Symlinks are not followed — a symlinked directory can cycle back into the
+ * tree and hang the walk, and a linked document's real copy is walked anyway.
+ */
 export function listDocs(root, config = loadConfig(root)) {
   const out = []
   const start = join(root, config.docsDir)
@@ -16,10 +20,12 @@ export function listDocs(root, config = loadConfig(root)) {
   return out.sort()
 
   function walk(dir) {
-    for (const name of readdirSync(dir)) {
-      const full = join(dir, name)
-      if (statSync(full).isDirectory()) walk(full)
-      else if (name.endsWith('.md')) out.push(relative(root, full).split(/[\\/]/).join('/'))
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = join(dir, entry.name)
+      if (entry.isDirectory()) walk(full)
+      else if (entry.isFile() && entry.name.endsWith('.md')) {
+        out.push(relative(root, full).split(/[\\/]/).join('/'))
+      }
     }
   }
 }
