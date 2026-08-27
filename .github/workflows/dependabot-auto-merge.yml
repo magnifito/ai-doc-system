@@ -1,0 +1,23 @@
+name: dependabot-auto-merge
+
+on: pull_request
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-merge:
+    # Auto-merge only non-major GitHub Actions bumps; npm bumps (astro majors
+    # in particular) stay manual. Branch protection still requires the full
+    # test matrix to pass before the merge actually happens.
+    if: github.actor == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: dependabot/fetch-metadata@v2
+        id: meta
+      - if: steps.meta.outputs.package-ecosystem == 'github_actions' && steps.meta.outputs.update-type != 'version-update:semver-major'
+        run: gh pr merge --auto --squash "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
