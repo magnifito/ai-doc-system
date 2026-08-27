@@ -9,18 +9,51 @@ jobs:
   test:
     # The case-exactness and run-direct-guard code exists for platform
     # differences, so the suite runs where those differences live — not
-    # only on Linux.
+    # only on Linux. Newer Node lines run on Linux to keep the matrix lean.
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
+        node: [20]
+        include:
+          - os: ubuntu-latest
+            node: 22
+          - os: ubuntu-latest
+            node: 24
     runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - run: npm ci
+      - run: npm test
+      - run: npm run lint:docs
+      - run: npm run lint:docs:advisory
+
+  # The published artifact, not the working tree: pack the tarball, install it
+  # into a fresh fixture repo, and run the CLI from node_modules. Catches
+  # missing `files` entries and broken bin wiring that unit tests never see.
+  pack-smoke:
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 20
       - run: npm ci
-      - run: npm test
-      - run: npm run lint:docs
-      - run: npm run lint:docs:advisory
+      - run: |
+          set -eux
+          TARBALL="$PWD/$(npm pack | tail -1)"
+          FIXTURE=$(mktemp -d)
+          cd "$FIXTURE"
+          git init -q
+          mkdir -p docs/engineering
+          printf -- '---\ntitle: Smoke\nkind: engineering\nstatus: active\nupdated: 2026-08-27\n---\n\n# Smoke\n' \
+            > docs/engineering/smoke.md
+          npm init -y > /dev/null
+          npm install "$TARBALL"
+          npx ai-doc-system --version
+          npx ai-doc-system gen
+          npx ai-doc-system check
+          npx ai-doc-system advisory

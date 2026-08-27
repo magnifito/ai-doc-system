@@ -5,6 +5,7 @@
     "_bmad",
     "skills-lock.json",
     "scripts/*.test.mjs",
+    ".github",
     "docs-migration.map.mjs",
     "templates",
     "site"
