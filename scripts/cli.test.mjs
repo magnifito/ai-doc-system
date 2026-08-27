@@ -1,5 +1,5 @@
 /**
- * Tests for the package CLI (`bin/cli.mjs`) — the entry point npm consumers
+ * Tests for the package CLI (`cli/cli.mjs`) — the entry point npm consumers
  * run as `npx ai-doc-system <command>`. Driven through child processes, which
  * also proves the scripts' run-direct guards fire only when intended.
  *
@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 
 const PACKAGE_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
-const BIN = join(PACKAGE_ROOT, 'bin', 'cli.mjs')
+const BIN = join(PACKAGE_ROOT, 'cli', 'cli.mjs')
 
 function cli(args, options = {}) {
   return execFileSync(process.execPath, [BIN, ...args], { encoding: 'utf8', stdio: 'pipe', ...options })

@@ -1,7 +1,18 @@
 {
   "name": "@puralex/ai-doc-system",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Tier a repository's docs by authority, validate frontmatter, generate an agent-readable index, and enforce it with a blocking gate.",
+  "keywords": [
+    "documentation",
+    "docs-as-code",
+    "ai-agents",
+    "agent-skills",
+    "claude",
+    "frontmatter",
+    "lint",
+    "docs",
+    "gate"
+  ],
   "type": "module",
   "license": "Apache-2.0",
   "repository": {
@@ -15,10 +26,10 @@
     "access": "public"
   },
   "bin": {
-    "ai-doc-system": "bin/cli.mjs"
+    "ai-doc-system": "cli/cli.mjs"
   },
   "files": [
-    "bin",
+    "cli",
     "scripts",
     "templates",
     "docs",

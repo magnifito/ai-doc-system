@@ -1,6 +1,11 @@
 # ai-doc-system
 
+[![test](https://github.com/magnifito/ai-doc-system/actions/workflows/test.yml/badge.svg)](https://github.com/magnifito/ai-doc-system/actions/workflows/test.yml)
+[![npm](https://img.shields.io/npm/v/%40puralex%2Fai-doc-system)](https://www.npmjs.com/package/@puralex/ai-doc-system)
+[![license](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
+
 A documentation system for repositories whose primary reader is an AI agent.
+**Website: [magnifito.github.io/ai-doc-system](https://magnifito.github.io/ai-doc-system/)**
 
 `docs/` is tiered by **authority** — how much weight a reader should give a document — rather than
 by topic. Every file carries validated frontmatter. An index is generated for agents to read instead
@@ -28,7 +33,7 @@ into an explicitly non-binding idea bank, and it is checkable by machine.
 | `scripts/*.test.mjs` | The test suite, over throwaway fixture trees, some of them real git repositories. Wire it in — a suite no runner executes is green exactly once. |
 | `SKILL.md` | The agent-facing procedure, including the judgement calls the mechanics do not cover. |
 | `templates/` | The migration map to fill in, and the `docs/README.md` contract to adapt. |
-| `bin/cli.mjs` | Package entry point — `ai-doc-system check\|gen\|fix\|advisory\|migrate` — for npm-based installs. |
+| `cli/cli.mjs` | Package entry point — `ai-doc-system init\|check\|gen\|fix\|advisory\|migrate` — for npm-based installs. |
 | `docs/` | This repo's own gated tree; `engineering/design.md` is the full design: the problem, the two rejected alternatives, and the limitations that survived implementation. |
 
 Plain ESM, Node 20+, one dependency: the `yaml` package — frontmatter holds lists and colon-bearing
@@ -128,17 +133,21 @@ From npm:
 
 ```bash
 npm install -D @puralex/ai-doc-system   # brings `yaml` with it
+npx ai-doc-system init                  # greenfield: docs/ contract + index + scripts, gate-clean
 npx ai-doc-system gen                   # regenerate INDEX.md and index.json
 npx ai-doc-system check                 # the blocking gate
 npx ai-doc-system advisory              # non-blocking drift report
 ```
 
-Or install as a skill and let an agent drive it:
+Or install as a Claude Code plugin and let an agent drive it:
 
-```bash
-git clone https://github.com/magnifito/ai-doc-system.git
-ln -s "$PWD/ai-doc-system" ~/.claude/skills/ai-doc-system
 ```
+/plugin marketplace add magnifito/ai-doc-system
+/plugin install ai-doc-system@magnifito
+```
+
+(A plain `git clone https://github.com/magnifito/ai-doc-system ~/.claude/skills/ai-doc-system`
+also works — the repo carries its own `.claude-plugin/plugin.json`.)
 
 Then, in the target repository, ask for the documentation system. [`SKILL.md`](SKILL.md) is the
 procedure: survey first, migrate, then the rules that outlive the migration.
