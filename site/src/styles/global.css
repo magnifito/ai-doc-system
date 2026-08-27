@@ -1,0 +1,386 @@
+/* ------------------------------------------------------------------ tokens */
+:root {
+  /* Palette named after the schema's own status vocabulary. */
+  --paper: #f4f6f3;      /* cool mist — the page */
+  --ink: #1b2420;        /* green-black prose */
+  --slate: #5c6b66;      /* secondary text, `reference` grey-blue-green */
+  --pine: #2e5e4e;       /* gate-passed green — links, CTAs */
+  --pine-deep: #234739;
+  --rust: #b4552d;       /* the violation color — spent on one section */
+  --panel: #0f1613;      /* dark code islands */
+  --panel-ink: #d7e0da;  /* text on panels */
+  --panel-dim: #7d8d85;  /* comments on panels */
+  --hairline: #d8ded9;
+
+  --serif-display: 'Instrument Serif', 'Iowan Old Style', georgia, serif;
+  --serif-text: 'Newsreader', 'Iowan Old Style', georgia, serif;
+  --mono: 'JetBrains Mono', ui-monospace, 'SF Mono', menlo, monospace;
+
+  --measure: 62ch;
+  --gutter: clamp(1.25rem, 5vw, 3rem);
+}
+
+/* ------------------------------------------------------------------ reset */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--serif-text);
+  font-size: clamp(1.0625rem, 0.95rem + 0.4vw, 1.1875rem);
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+img {
+  max-width: 100%;
+}
+
+a {
+  color: var(--pine);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+a:hover {
+  color: var(--pine-deep);
+}
+
+:focus-visible {
+  outline: 2px solid var(--pine);
+  outline-offset: 3px;
+}
+
+::selection {
+  background: var(--pine);
+  color: var(--paper);
+}
+
+/* --------------------------------------------------------------- document */
+/* The signature device: every section of the page is itself a document in
+   the system, and opens with its own frontmatter block. */
+.doc {
+  max-width: calc(var(--measure) + 2 * var(--gutter));
+  margin: 0 auto;
+  padding: clamp(4rem, 9vh, 7rem) var(--gutter) 0;
+}
+
+.frontmatter {
+  font-family: var(--mono);
+  font-size: 0.8125rem;
+  line-height: 1.7;
+  color: var(--slate);
+  margin: 0 0 2.25rem;
+}
+
+/* Astro's HTML compression collapses source newlines, so each frontmatter
+   line is an explicit block. */
+.frontmatter .line {
+  display: block;
+}
+
+.frontmatter .fence {
+  color: var(--hairline);
+  user-select: none;
+}
+
+.frontmatter .key {
+  color: var(--slate);
+}
+
+.frontmatter .value {
+  color: var(--pine);
+}
+
+.frontmatter .value.rust {
+  color: var(--rust);
+}
+
+/* ------------------------------------------------------------------- type */
+h1,
+h2 {
+  font-family: var(--serif-display);
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+  margin: 0 0 1.5rem;
+}
+
+h1 {
+  font-size: clamp(2.6rem, 1.6rem + 4.5vw, 4.75rem);
+  line-height: 1.04;
+}
+
+h2 {
+  font-size: clamp(1.9rem, 1.4rem + 2vw, 2.9rem);
+  line-height: 1.12;
+}
+
+h1 em,
+h2 em {
+  font-style: italic;
+  color: var(--pine);
+}
+
+.rust-section h2 em {
+  color: var(--rust);
+}
+
+p {
+  margin: 0 0 1.25rem;
+  max-width: var(--measure);
+}
+
+.lede {
+  font-size: 1.16em;
+  color: var(--ink);
+}
+
+strong {
+  font-weight: 600;
+}
+
+small,
+.caption {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  color: var(--slate);
+}
+
+code {
+  font-family: var(--mono);
+  font-size: 0.86em;
+  background: #e7ebe6;
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+}
+
+/* ---------------------------------------------------------------- panels */
+pre {
+  font-family: var(--mono);
+  font-size: 0.8125rem;
+  line-height: 1.75;
+  background: var(--panel);
+  color: var(--panel-ink);
+  border-radius: 10px;
+  padding: 1.4rem 1.6rem;
+  overflow-x: auto;
+  margin: 2rem 0;
+  tab-size: 2;
+}
+
+pre code {
+  background: none;
+  padding: 0;
+  font-size: inherit;
+}
+
+pre .c {
+  color: var(--panel-dim);
+}
+
+pre .g {
+  color: #7fc8a9;
+}
+
+pre .r {
+  color: #e0906c;
+}
+
+pre .y {
+  color: #d9c97e;
+}
+
+pre .prompt {
+  color: var(--panel-dim);
+  user-select: none;
+}
+
+/* ------------------------------------------------------------------ hero */
+.hero {
+  padding-top: clamp(5rem, 14vh, 9rem);
+}
+
+.hero .frontmatter {
+  font-size: 0.875rem;
+}
+
+.hero .frontmatter .line {
+  opacity: 0;
+  animation: rise 0.5s ease-out forwards;
+}
+
+.hero .frontmatter .line:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.hero .frontmatter .line:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+.hero .frontmatter .line:nth-child(4) {
+  animation-delay: 0.45s;
+}
+
+.hero .frontmatter .line:nth-child(5) {
+  animation-delay: 0.6s;
+}
+
+.hero h1 {
+  opacity: 0;
+  animation: rise 0.7s 0.5s ease-out forwards;
+}
+
+.hero .lede,
+.hero .cta-row {
+  opacity: 0;
+  animation: rise 0.7s 0.75s ease-out forwards;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(0.6rem);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  .hero .frontmatter .line,
+  .hero h1,
+  .hero .lede,
+  .hero .cta-row {
+    animation: none;
+    opacity: 1;
+  }
+}
+
+/* ------------------------------------------------------------------- cta */
+.cta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.9rem;
+  margin: 2.4rem 0 0;
+}
+
+.button {
+  font-family: var(--mono);
+  font-size: 0.875rem;
+  text-decoration: none;
+  padding: 0.8rem 1.5rem;
+  border-radius: 8px;
+  border: 1px solid var(--pine);
+}
+
+.button.primary {
+  background: var(--pine);
+  color: var(--paper);
+}
+
+.button.primary:hover {
+  background: var(--pine-deep);
+  border-color: var(--pine-deep);
+  color: var(--paper);
+}
+
+.button.ghost {
+  color: var(--pine);
+}
+
+.button.ghost:hover {
+  color: var(--pine-deep);
+  border-color: var(--pine-deep);
+}
+
+/* ----------------------------------------------------------------- lists */
+ul.moves {
+  list-style: none;
+  padding: 0;
+  margin: 2rem 0;
+  max-width: var(--measure);
+}
+
+ul.moves li {
+  padding: 1.3rem 0;
+  border-top: 1px solid var(--hairline);
+}
+
+ul.moves li:last-child {
+  border-bottom: 1px solid var(--hairline);
+}
+
+ul.moves .move-name {
+  font-family: var(--serif-display);
+  font-size: 1.45rem;
+  display: block;
+  margin-bottom: 0.35rem;
+}
+
+ul.moves p {
+  margin: 0;
+  color: var(--slate);
+}
+
+/* --------------------------------------------------------------- install */
+.paths {
+  display: grid;
+  gap: 2.5rem;
+  margin-top: 2rem;
+}
+
+.path h3 {
+  font-family: var(--mono);
+  font-weight: 500;
+  font-size: 0.8125rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--slate);
+  margin: 0 0 0.6rem;
+}
+
+.path p {
+  color: var(--slate);
+  font-size: 0.95em;
+}
+
+.path pre {
+  margin: 1rem 0 0;
+}
+
+/* ---------------------------------------------------------------- footer */
+footer.doc {
+  padding-bottom: 5rem;
+}
+
+footer .cta-row {
+  margin-bottom: 3rem;
+}
+
+footer small a {
+  color: var(--slate);
+}
+
+/* ------------------------------------------------------------ wide panels */
+@media (min-width: 900px) {
+  pre.wide {
+    width: min(78ch, calc(100vw - 2 * var(--gutter)));
+  }
+}

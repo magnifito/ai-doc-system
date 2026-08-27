@@ -1,0 +1,201 @@
+---
+import '@fontsource/instrument-serif'
+import '@fontsource/instrument-serif/400-italic.css'
+import '@fontsource/newsreader'
+import '@fontsource/newsreader/400-italic.css'
+import '@fontsource/newsreader/600.css'
+import '@fontsource/jetbrains-mono'
+import '@fontsource/jetbrains-mono/500.css'
+import '../styles/global.css'
+
+const title = 'ai-doc-system'
+const description =
+  'Tier your docs by authority, stamp every file with machine-readable status, and let a blocking gate keep it true — so your agent never builds from a document that was never a promise.'
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title} — a documentation gate for agent-built repositories</title>
+    <meta name="description" content={description} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='0.9em' font-size='90'>⛩️</text></svg>" />
+  </head>
+  <body>
+    <!-- stage 1 · the hook. This page is itself a document in the system;
+         each section carries its own frontmatter, and the reader follows a
+         document through the promotion lifecycle: reference → shipped. -->
+    <header class="doc hero">
+      <p class="frontmatter" aria-hidden="true">
+        <span class="line"><span class="fence">---</span></span>
+        <span class="line"><span class="key">title:</span> <span class="value">Recurring Invoices</span></span>
+        <span class="line"><span class="key">kind:</span> <span class="value rust">reference</span></span>
+        <span class="line"><span class="key">status:</span> <span class="value rust">reference &nbsp;# not a commitment. never implement from this file.</span></span>
+        <span class="line"><span class="fence">---</span></span>
+      </p>
+      <h1>Your agent found a spec.<br />It was <em>never a promise.</em></h1>
+      <p class="lede">
+        A docs tree with no metadata fails one way: an agent greps for a feature, finds a confident,
+        well-written specification, and cannot tell whether it describes something your product
+        <strong>has</strong>, something you <strong>committed to build</strong> — or something a
+        competitor has that you never will. So it builds the third one.
+      </p>
+      <div class="cta-row">
+        <a class="button primary" href="#install">Install the gate</a>
+        <a class="button ghost" href="https://github.com/magnifito/ai-doc-system">Read the source</a>
+      </div>
+    </header>
+
+    <!-- stage 2 · the failure mode -->
+    <section class="doc rust-section">
+      <p class="frontmatter" aria-hidden="true">
+        <span class="line"><span class="fence">---</span></span>
+        <span class="line"><span class="key">kind:</span> <span class="value rust">problem</span></span>
+        <span class="line"><span class="key">status:</span> <span class="value">active</span></span>
+        <span class="line"><span class="fence">---</span></span>
+      </p>
+      <h2>This is a <em>correctness</em> problem, not a tidiness problem</h2>
+      <p>
+        The repository this system was designed against held 301 Markdown files. 208 of them were
+        feature documents captured from a competitor — frozen for months, indistinguishable from
+        committed scope. Two files out of 301 had any machine-readable metadata. The only document
+        that tried to answer “is this built?” was a 1,745-line roadmap with forty
+        “✅&nbsp;Complete” clauses appended to a single paragraph.
+      </p>
+      <p>
+        None of that is untidiness. It is a tree whose <em>default failure mode</em> is your agent
+        implementing an uncommitted feature from a document that was never a commitment — confidently,
+        with tests.
+      </p>
+    </section>
+
+    <!-- stage 3 · the mechanism -->
+    <section class="doc">
+      <p class="frontmatter" aria-hidden="true">
+        <span class="line"><span class="fence">---</span></span>
+        <span class="line"><span class="key">kind:</span> <span class="value">mechanism</span></span>
+        <span class="line"><span class="key">status:</span> <span class="value">active</span></span>
+        <span class="line"><span class="fence">---</span></span>
+      </p>
+      <h2>Three moves, and a check that <em>keeps them true</em></h2>
+
+      <ul class="moves">
+        <li>
+          <span class="move-name">Tier by authority, not by topic</span>
+          <p>
+            How much weight should a reader give this file? <code>reference/</code> is captured from
+            elsewhere and never a build spec. <code>product/</code> is committed scope.
+            <code>plans/</code> is work in flight. Promotion between tiers is one <code>git mv</code>.
+          </p>
+        </li>
+        <li>
+          <span class="move-name">Frontmatter on every file</span>
+          <p>
+            A closed status vocabulary — <code>reference · draft · active · shipped ·
+            superseded</code> — plus <code>kind</code> derived from the path and asserted against it.
+            “Not a commitment” becomes machine-detectable.
+          </p>
+        </li>
+        <li>
+          <span class="move-name">An index agents read instead of grepping</span>
+          <p>
+            One generated <code>index.json</code>. “Is feature X built?” becomes a single file read
+            that ends in <code>kind: reference</code> — instead of a grep that ends in a confident,
+            wrong yes.
+          </p>
+        </li>
+      </ul>
+
+      <p>
+        And because unenforced structure is a suggestion, a blocking gate — nine assertions, wired
+        into your quality gate, each of which can only fire on a real defect:
+      </p>
+
+<pre class="wide"><code><span class="prompt">$</span> npx ai-doc-system check
+<span class="r">docs/reference/crm/pipelines.md:status — is "active" but everything
+  under docs/reference/ is status: reference</span>
+<span class="r">docs/INDEX.md:index — stale — run `node scripts/gen-docs-index.mjs`</span>
+<span class="r">check-docs FAILED — 2 violation(s).</span>
+
+<span class="prompt">$</span> npx ai-doc-system gen && npx ai-doc-system check
+<span class="g">check-docs: OK</span></code></pre>
+
+      <p class="caption">
+        What it deliberately does not assert — document age, prose style, <code>updated:</code>
+        versus git — goes to a non-blocking advisory report. A gate that cries wolf gets bypassed.
+      </p>
+    </section>
+
+    <!-- stage 4 · proof -->
+    <section class="doc">
+      <p class="frontmatter" aria-hidden="true">
+        <span class="line"><span class="fence">---</span></span>
+        <span class="line"><span class="key">kind:</span> <span class="value">proof</span></span>
+        <span class="line"><span class="key">verified_on:</span> <span class="value">2026-08-27</span></span>
+        <span class="line"><span class="fence">---</span></span>
+      </p>
+      <h2>It eats its <em>own cooking</em></h2>
+      <p>
+        The gate runs on its own repository, in CI, on every push. On its very first self-hosted run
+        it caught a dead documentation pointer in one of its own comments. The test suite — 92 tests
+        over throwaway fixture trees, some of them real git repositories — runs on Linux, macOS and
+        Windows, because “passes on the maintainer’s laptop” is exactly the kind of claim this
+        system exists to reject.
+      </p>
+      <p>
+        First applied to that 301-document monorepo: every captured document became an explicitly
+        non-binding idea bank entry, every path survived with its git history, and the question “is
+        this built?” became answerable by machine.
+      </p>
+    </section>
+
+    <!-- stage 5 · install. The document reaches `shipped`. -->
+    <section class="doc" id="install">
+      <p class="frontmatter" aria-hidden="true">
+        <span class="line"><span class="fence">---</span></span>
+        <span class="line"><span class="key">kind:</span> <span class="value">install</span></span>
+        <span class="line"><span class="key">status:</span> <span class="value">shipped</span></span>
+        <span class="line"><span class="fence">---</span></span>
+      </p>
+      <h2>Install it, then <em>stop thinking about it</em></h2>
+
+      <div class="paths">
+        <div class="path">
+          <h3>As an agent skill — the full treatment</h3>
+          <p>
+            Your agent surveys the tree, proposes the migration, moves every file with
+            <code>git mv</code>, stamps the metadata, and wires the gate in. The skill encodes the
+            judgement calls, not just the mechanics.
+          </p>
+<pre><code><span class="prompt">$</span> git clone https://github.com/magnifito/ai-doc-system.git
+<span class="prompt">$</span> ln -s "$PWD/ai-doc-system" ~/.claude/skills/ai-doc-system
+<span class="c"># then, in your repository:</span>
+<span class="prompt">&gt;</span> set up the documentation system in this repo</code></pre>
+        </div>
+
+        <div class="path">
+          <h3>From npm — just the tooling</h3>
+<pre><code><span class="prompt">$</span> npm install -D @puralex/ai-doc-system
+<span class="prompt">$</span> npx ai-doc-system gen        <span class="c"># INDEX.md + index.json</span>
+<span class="prompt">$</span> npx ai-doc-system check      <span class="c"># the blocking gate</span>
+<span class="prompt">$</span> npx ai-doc-system advisory   <span class="c"># non-blocking drift report</span></code></pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- footer -->
+    <footer class="doc">
+      <div class="cta-row">
+        <a class="button primary" href="https://github.com/magnifito/ai-doc-system">Star it on GitHub</a>
+        <a class="button ghost" href="https://github.com/magnifito/ai-doc-system/blob/main/docs/engineering/design.md">The full design, rejected alternatives included</a>
+      </div>
+      <small>
+        Apache-2.0 · plain ESM, Node 20+, one dependency ·
+        <a href="https://github.com/magnifito/ai-doc-system/blob/main/SKILL.md">SKILL.md</a> is the
+        agent-facing procedure
+      </small>
+    </footer>
+  </body>
+</html>

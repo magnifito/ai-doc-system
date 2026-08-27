@@ -6,6 +6,7 @@
     "skills-lock.json",
     "scripts/*.test.mjs",
     "docs-migration.map.mjs",
-    "templates"
+    "templates",
+    "site"
   ]
 }
