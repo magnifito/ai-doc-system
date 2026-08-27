@@ -1,0 +1,27 @@
+name: Feature request
+description: Propose a new assertion, command, or configuration option.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: >
+        What goes wrong in a real docs tree today that this would prevent? Concrete failure
+        stories beat abstract wishes.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: What should the tool do, and where — blocking gate, advisory, CLI, config?
+    validations:
+      required: true
+  - type: textarea
+    id: nonassert
+    attributes:
+      label: Why should this block?
+      description: >
+        The design deliberately keeps the blocking gate small (see docs/engineering/design.md).
+        If this is a new blocking assertion, argue why it will not cry wolf.

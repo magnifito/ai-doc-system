@@ -1,0 +1,44 @@
+name: Bug report
+description: The gate gave a wrong verdict, a script crashed, or the CLI misbehaved.
+labels: [bug]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Output of `npx ai-doc-system --version`
+      placeholder: 1.2.0
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: Platform
+      placeholder: macOS 15 / Node 22.6
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Minimal reproduction
+      description: >
+        The smallest docs/ tree (paths + frontmatter) and command that shows the problem.
+        Three or four files is usually enough.
+      placeholder: |
+        docs/engineering/x.md with:
+        ---
+        title: X
+        kind: engineering
+        status: active
+        updated: 2026-08-27
+        ---
+        then `npx ai-doc-system check` prints …
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected vs actual
+      description: What should have happened, and the exact output you got instead.
+    validations:
+      required: true
