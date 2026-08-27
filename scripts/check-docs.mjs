@@ -231,10 +231,14 @@ export function checkDocs(root, config = loadConfig(root)) {
     }
   }
 
-  // 4. index freshness — regenerate in memory, compare with what is committed
+  // 4. index freshness — regenerate in memory, compare with what is committed.
+  // CRLF is normalised first: git on Windows checks the LF index out as CRLF
+  // (autocrlf), and that is the same content, not a stale file.
   for (const [path, content] of renderIndex(root, config)) {
     const current = existsSync(join(root, path)) ? readFileSync(join(root, path), 'utf8') : null
-    if (current !== content) add(path, 'index', 'stale — run `node scripts/gen-docs-index.mjs`')
+    if (current?.replaceAll('\r\n', '\n') !== content) {
+      add(path, 'index', 'stale — run `node scripts/gen-docs-index.mjs`')
+    }
   }
 
   return violations

@@ -227,7 +227,9 @@ export function main() {
       } catch {
         /* missing counts as stale */
       }
-      if (current !== content) {
+      // CRLF-tolerant for the same reason as the gate's assertion 4: a Windows
+      // checkout is not a stale index.
+      if (current?.replaceAll('\r\n', '\n') !== content) {
         console.error(`stale: ${path} — run \`node scripts/gen-docs-index.mjs\``)
         stale = true
       }

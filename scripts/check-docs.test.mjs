@@ -12,7 +12,7 @@
  * project's blocking gate next to `lint:docs`.
  */
 import { strict as assert } from 'node:assert'
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import test from 'node:test'
@@ -185,6 +185,21 @@ test('3e. a link through a wrong-case directory segment is dead', () => {
 
 test('4a. a freshly generated index is accepted', () => {
   assert.deepEqual(run({ 'docs/engineering/quality-gate.md': GOOD }).filter((v) => v.field === 'index'), [])
+})
+
+test('4c. an index checked out with CRLF line endings is not stale', () => {
+  // Git on Windows defaults to autocrlf=true, so a committed LF index arrives
+  // as CRLF. Same bytes-per-line content — only the line terminator differs.
+  const root = fixture({ 'docs/engineering/quality-gate.md': GOOD })
+  try {
+    for (const name of ['docs/index.json', 'docs/INDEX.md']) {
+      const lf = readFileSync(join(root, name), 'utf8')
+      writeFileSync(join(root, name), lf.replaceAll('\n', '\r\n'))
+    }
+    assert.deepEqual(checkDocs(root).filter((v) => v.field === 'index'), [])
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
 })
 
 test('4b. a stale or missing index fails', () => {

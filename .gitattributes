@@ -1,0 +1,4 @@
+# Generated index files are compared byte-for-byte by the gate; keep every
+# text file LF in the working tree so Windows checkouts match what the
+# generator writes.
+* text=auto eol=lf
