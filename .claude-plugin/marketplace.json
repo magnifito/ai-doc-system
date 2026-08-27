@@ -1,0 +1,14 @@
+{
+  "name": "magnifito",
+  "owner": { "name": "Kiril Kirov", "url": "https://github.com/magnifito" },
+  "metadata": {
+    "description": "Magnifito's Claude Code plugins — currently ai-doc-system, a docs-by-authority system with a blocking gate."
+  },
+  "plugins": [
+    {
+      "name": "ai-doc-system",
+      "source": "./",
+      "description": "Tier a repository's docs by authority, validate frontmatter, generate an agent-readable index, and enforce it with a blocking gate."
+    }
+  ]
+}

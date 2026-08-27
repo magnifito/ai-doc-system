@@ -48,9 +48,16 @@ Ask the user four questions and treat the answers as constraints, not suggestion
 
 ## 2. Install the scripts
 
-Copy `scripts/*.mjs` into the target repo's `scripts/` (or wherever its tooling lives). They are
-plain ESM, Node 20+, with one dependency: add `yaml` to the target's dependencies (`npm install
-yaml`, or the host's package manager equivalent) — without it every script fails on import.
+Two routes; prefer the first:
+
+**npm.** `npm install -D @puralex/ai-doc-system` in the target, then `npx ai-doc-system init` for a
+greenfield tree (contract, index, scripts — gate-clean immediately), or wire the commands by hand
+for a migration.
+
+**Vendor.** Copy `scripts/*.mjs` from this skill's own directory (`${CLAUDE_SKILL_DIR}/scripts/`
+when installed as a plugin — never resolve the path against the target repo) into the target's
+`scripts/`. Plain ESM, Node 20+, one dependency: add `yaml` to the target's dependencies (`npm
+install yaml`, or the host's package manager equivalent) — without it every script fails on import.
 
 If the target's answers differ from the defaults, write `docs-system.config.json` at its root —
 `docsDir`, `tiers`, `statuses`, `tierStatus`, `exempt`, `tierOrder`, `indexSubdivide`,
@@ -72,7 +79,8 @@ suite no runner executes is green exactly once.
 
 ## 3. Migrate
 
-Copy `templates/docs-migration.map.example.mjs` to the target root as `docs-migration.map.mjs` and
+Copy `templates/docs-migration.map.example.mjs` (from `${CLAUDE_SKILL_DIR}/templates/` or
+`node_modules/@puralex/ai-doc-system/templates/`) to the target root as `docs-migration.map.mjs` and
 write the real map. Then:
 
 ```bash

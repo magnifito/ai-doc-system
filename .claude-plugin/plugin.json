@@ -1,0 +1,10 @@
+{
+  "name": "ai-doc-system",
+  "description": "Tier a repository's docs by authority, validate frontmatter, generate an agent-readable index, and enforce it with a blocking gate.",
+  "version": "1.2.0",
+  "author": { "name": "Kiril Kirov" },
+  "homepage": "https://magnifito.github.io/ai-doc-system/",
+  "repository": "https://github.com/magnifito/ai-doc-system",
+  "license": "Apache-2.0",
+  "keywords": ["documentation", "docs-as-code", "ai-agents", "frontmatter"]
+}
