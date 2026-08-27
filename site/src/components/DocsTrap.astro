@@ -1,0 +1,57 @@
+---
+// The trap: three files that look identical; only one is a real promise.
+---
+<figure class="figure">
+  <svg viewBox="0 0 720 330" role="img" aria-label="Three identical-looking documents. An agent picks the wrong one.">
+    <!-- three identical doc cards -->
+    <g class="sv">
+      <!-- card template x3 -->
+      <g transform="translate(40 46)">
+        <rect class="sv-card" width="180" height="150" rx="10" />
+        <text class="sv-mono" x="16" y="30">invoices.md</text>
+        <line class="sv-rule" x1="16" y1="52" x2="164" y2="52" />
+        <line class="sv-line" x1="16" y1="76" x2="150" y2="76" />
+        <line class="sv-line" x1="16" y1="96" x2="160" y2="96" />
+        <line class="sv-line" x1="16" y1="116" x2="120" y2="116" />
+        <text class="sv-chip" x="16" y="-14">already built?</text>
+      </g>
+      <g transform="translate(270 46)">
+        <rect class="sv-card" width="180" height="150" rx="10" />
+        <text class="sv-mono" x="16" y="30">invoices.md</text>
+        <line class="sv-rule" x1="16" y1="52" x2="164" y2="52" />
+        <line class="sv-line" x1="16" y1="76" x2="150" y2="76" />
+        <line class="sv-line" x1="16" y1="96" x2="160" y2="96" />
+        <line class="sv-line" x1="16" y1="116" x2="120" y2="116" />
+        <text class="sv-chip" x="16" y="-14">promised?</text>
+      </g>
+      <g transform="translate(500 46)">
+        <rect class="sv-card" width="180" height="150" rx="10" />
+        <text class="sv-mono" x="16" y="30">invoices.md</text>
+        <line class="sv-rule" x1="16" y1="52" x2="164" y2="52" />
+        <line class="sv-line" x1="16" y1="76" x2="150" y2="76" />
+        <line class="sv-line" x1="16" y1="96" x2="160" y2="96" />
+        <line class="sv-line" x1="16" y1="116" x2="120" y2="116" />
+        <text class="sv-chip sv-rust" x="16" y="-14">a competitor's?</text>
+      </g>
+
+      <!-- agent -->
+      <rect class="sv-agent" x="300" y="264" width="120" height="42" rx="21" />
+      <text class="sv-mono sv-on-dark" x="360" y="290" text-anchor="middle">agent</text>
+
+      <!-- dashed considered paths -->
+      <path class="sv-path" d="M 322 266 C 250 240 170 230 132 200" />
+      <path class="sv-path" d="M 360 262 L 360 202" />
+      <!-- the chosen, wrong path -->
+      <path class="sv-path-rust" d="M 398 266 C 470 240 550 230 588 202" marker-end="url(#arrow-rust)" />
+      <text class="sv-chip sv-rust" x="475" y="262">builds this one</text>
+    </g>
+    <defs>
+      <marker id="arrow-rust" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--rust)" />
+      </marker>
+    </defs>
+  </svg>
+  <figcaption>
+    Three files. Same name, same confident prose. Nothing on any of them says which one is real.
+  </figcaption>
+</figure>

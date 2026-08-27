@@ -1,0 +1,48 @@
+---
+// Move 1 — shelves ordered by trust, not by topic.
+---
+<figure class="figure">
+  <svg viewBox="0 0 720 330" role="img" aria-label="Documents shelved by how much you can trust them, product on top, archive at the bottom.">
+    <g class="sv">
+      <!-- trust axis -->
+      <line class="sv-axis" x1="46" y1="290" x2="46" y2="40" marker-end="url(#arrow-pine)" />
+      <text class="sv-chip" x="26" y="170" transform="rotate(-90 26 170)" text-anchor="middle">trust</text>
+
+      <!-- shelves, most trustworthy on top -->
+      <g transform="translate(80 34)">
+        <rect class="sv-shelf sv-shelf-top" width="600" height="46" rx="8" />
+        <text class="sv-mono sv-strong" x="20" y="29">product/</text>
+        <text class="sv-chip" x="580" y="29" text-anchor="end">what we promised to build</text>
+      </g>
+      <g transform="translate(80 90)">
+        <rect class="sv-shelf" width="600" height="46" rx="8" />
+        <text class="sv-mono sv-strong" x="20" y="29">engineering/</text>
+        <text class="sv-chip" x="580" y="29" text-anchor="end">how this repo works today</text>
+      </g>
+      <g transform="translate(80 146)">
+        <rect class="sv-shelf" width="600" height="46" rx="8" />
+        <text class="sv-mono sv-strong" x="20" y="29">plans/</text>
+        <text class="sv-chip" x="580" y="29" text-anchor="end">work in flight</text>
+      </g>
+      <g transform="translate(80 202)">
+        <rect class="sv-shelf sv-shelf-ref" width="600" height="46" rx="8" />
+        <text class="sv-mono sv-strong" x="20" y="29">reference/</text>
+        <text class="sv-chip sv-rust" x="580" y="29" text-anchor="end">borrowed ideas — never build from here</text>
+      </g>
+      <g transform="translate(80 258)">
+        <rect class="sv-shelf sv-shelf-dim" width="600" height="46" rx="8" />
+        <text class="sv-mono" x="20" y="29">archive/</text>
+        <text class="sv-chip" x="580" y="29" text-anchor="end">replaced — kept, not believed</text>
+      </g>
+    </g>
+    <defs>
+      <marker id="arrow-pine" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--pine)" />
+      </marker>
+    </defs>
+  </svg>
+  <figcaption>
+    Folders answer one question: how much weight should a reader give this file? Moving a file up a
+    shelf is one <code>git mv</code>.
+  </figcaption>
+</figure>

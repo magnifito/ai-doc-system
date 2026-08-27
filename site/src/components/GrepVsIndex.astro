@@ -1,0 +1,51 @@
+---
+// Move 3 — one map instead of a blind grep.
+---
+<figure class="figure">
+  <svg viewBox="0 0 720 300" role="img" aria-label="Before: an agent greps through many files and gets a wrong answer. After: it reads one index and gets the right one.">
+    <g class="sv">
+      <!-- divider -->
+      <line class="sv-rule" x1="360" y1="20" x2="360" y2="280" />
+      <text class="sv-chip" x="30" y="30">before · grep</text>
+      <text class="sv-chip" x="392" y="30">after · one file read</text>
+
+      <!-- BEFORE: tangle -->
+      <rect class="sv-agent" x="30" y="130" width="90" height="38" rx="19" />
+      <text class="sv-mono sv-on-dark" x="75" y="154" text-anchor="middle">agent</text>
+      <g>
+        <rect class="sv-mini" x="240" y="52"  width="84" height="30" rx="6" />
+        <rect class="sv-mini" x="240" y="96"  width="84" height="30" rx="6" />
+        <rect class="sv-mini" x="240" y="140" width="84" height="30" rx="6" />
+        <rect class="sv-mini" x="240" y="184" width="84" height="30" rx="6" />
+        <rect class="sv-mini" x="240" y="228" width="84" height="30" rx="6" />
+      </g>
+      <path class="sv-path" d="M 122 140 C 180 90 200 130 238 67" />
+      <path class="sv-path" d="M 122 146 C 170 190 205 80 238 111" />
+      <path class="sv-path" d="M 122 152 C 180 120 200 220 238 155" />
+      <path class="sv-path" d="M 122 158 C 170 130 210 260 238 199" />
+      <path class="sv-path-rust" d="M 122 164 C 180 240 205 180 238 243" marker-end="url(#arrow-rust2)" />
+      <text class="sv-chip sv-rust" x="150" y="262">"yes, here's the spec" (wrong)</text>
+
+      <!-- AFTER: one hop -->
+      <rect class="sv-agent" x="392" y="130" width="90" height="38" rx="19" />
+      <text class="sv-mono sv-on-dark" x="437" y="154" text-anchor="middle">agent</text>
+      <rect class="sv-index" x="518" y="128" width="106" height="42" rx="8" />
+      <text class="sv-mono sv-strong" x="571" y="154" text-anchor="middle">index.json</text>
+      <path class="sv-path-pine" d="M 484 149 L 514 149" marker-end="url(#arrow-pine2)" />
+      <text class="sv-chip sv-pine-t" x="392" y="216">"kind: reference — not built,</text>
+      <text class="sv-chip sv-pine-t" x="392" y="236">not promised. skipping."</text>
+    </g>
+    <defs>
+      <marker id="arrow-rust2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--rust)" />
+      </marker>
+      <marker id="arrow-pine2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--pine)" />
+      </marker>
+    </defs>
+  </svg>
+  <figcaption>
+    “Is feature X built?” stops being a treasure hunt. One generated map, cheap enough to read
+    whole, with every file's badge in it.
+  </figcaption>
+</figure>

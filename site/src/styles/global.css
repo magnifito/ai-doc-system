@@ -384,3 +384,199 @@ footer small a {
     width: min(78ch, calc(100vw - 2 * var(--gutter)));
   }
 }
+
+/* --------------------------------------------------------------- figures */
+.figure {
+  margin: 2.5rem 0;
+}
+
+.figure svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.figure figcaption {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  line-height: 1.7;
+  color: var(--slate);
+  max-width: 54ch;
+  margin-top: 0.9rem;
+}
+
+.figure figcaption code {
+  font-size: 0.95em;
+}
+
+/* SVG vocabulary — one visual language for every diagram. */
+.sv-card {
+  fill: #fdfefd;
+  stroke: var(--hairline);
+  stroke-width: 1.5;
+}
+
+.sv-mini {
+  fill: #fdfefd;
+  stroke: var(--hairline);
+  stroke-width: 1.5;
+}
+
+.sv-mini-bad {
+  stroke: var(--rust);
+  stroke-dasharray: 4 3;
+}
+
+.sv-index {
+  fill: #e7efe9;
+  stroke: var(--pine);
+  stroke-width: 1.5;
+}
+
+.sv-shelf {
+  fill: #eaeeea;
+}
+
+.sv-shelf-top {
+  fill: #dbe7e0;
+  stroke: var(--pine);
+  stroke-width: 1.5;
+}
+
+.sv-shelf-ref {
+  fill: #f2e9e2;
+}
+
+.sv-shelf-dim {
+  fill: #eceeec;
+  opacity: 0.55;
+}
+
+.sv-agent {
+  fill: var(--panel);
+}
+
+.sv-gate {
+  fill: var(--panel);
+}
+
+.sv-stamp {
+  fill: none;
+  stroke: var(--rust);
+  stroke-width: 3.5;
+}
+
+.sv-mono {
+  font-family: var(--mono);
+  font-size: 14px;
+  fill: var(--ink);
+}
+
+.sv-strong {
+  font-weight: 500;
+}
+
+.sv-chip {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  fill: var(--slate);
+}
+
+.sv-line {
+  stroke: var(--hairline);
+  stroke-width: 5;
+  stroke-linecap: round;
+}
+
+.sv-rule {
+  stroke: var(--hairline);
+  stroke-width: 1;
+}
+
+.sv-axis {
+  stroke: var(--pine);
+  stroke-width: 1.5;
+}
+
+.sv-path {
+  fill: none;
+  stroke: var(--slate);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 4;
+  opacity: 0.6;
+}
+
+.sv-path-rust {
+  fill: none;
+  stroke: var(--rust);
+  stroke-width: 2;
+}
+
+.sv-path-pine {
+  fill: none;
+  stroke: var(--pine);
+  stroke-width: 2;
+}
+
+.sv-rust {
+  fill: var(--rust);
+}
+
+.sv-rust-t {
+  fill: var(--rust);
+}
+
+.sv-pine {
+  fill: var(--pine);
+}
+
+.sv-pine-t {
+  fill: var(--pine);
+}
+
+.sv-on-dark {
+  fill: var(--panel-ink);
+}
+
+.sv-on-dark-dim {
+  fill: var(--panel-dim);
+}
+
+.sv-stamp-text {
+  font-family: var(--mono);
+  font-size: 22px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  fill: var(--rust);
+}
+
+.sv-stamp-sub {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  fill: var(--rust);
+  opacity: 0.8;
+}
+
+/* ------------------------------------------------------------ stat chips */
+.stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin: 1.8rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.stats li {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  color: var(--slate);
+  border: 1px solid var(--hairline);
+  border-radius: 999px;
+  padding: 0.45rem 0.95rem;
+}
+
+.stats li strong {
+  color: var(--ink);
+  font-weight: 500;
+}
