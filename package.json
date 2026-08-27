@@ -1,15 +1,29 @@
 {
   "name": "ai-doc-system",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Tier a repository's docs by authority, validate frontmatter, generate an agent-readable index, and enforce it with a blocking gate.",
   "type": "module",
   "license": "UNLICENSED",
   "private": true,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/magnifito/ai-doc-system.git"
+  },
   "engines": {
     "node": ">=20"
   },
+  "bin": {
+    "ai-doc-system": "bin/cli.mjs"
+  },
+  "files": [
+    "bin",
+    "scripts",
+    "templates",
+    "docs",
+    "SKILL.md"
+  ],
   "scripts": {
-    "test": "node --test scripts/*.test.mjs",
+    "test": "node --test",
     "lint:docs": "node scripts/check-docs.mjs",
     "lint:docs:advisory": "node scripts/check-docs-advisory.mjs",
     "gen:docs-index": "node scripts/gen-docs-index.mjs",

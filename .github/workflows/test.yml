@@ -7,7 +7,14 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    # The case-exactness and run-direct-guard code exists for platform
+    # differences, so the suite runs where those differences live — not
+    # only on Linux.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -15,3 +22,5 @@ jobs:
           node-version: 20
       - run: npm ci
       - run: npm test
+      - run: npm run lint:docs
+      - run: npm run lint:docs:advisory

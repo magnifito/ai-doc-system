@@ -21,6 +21,7 @@ import { parseFrontmatter } from './docs-frontmatter.mjs'
 import { loadConfig } from './docs-config.mjs'
 import { isExempt, kindForPath, moduleForPath } from './docs-taxonomy.mjs'
 import { listDocs, repoRoot } from './docs-fs.mjs'
+import { runDirect } from './docs-run.mjs'
 
 /**
  * Replace or insert one top-level scalar line inside a raw frontmatter block,
@@ -74,7 +75,7 @@ export function fixFrontmatter(root, config = loadConfig(root), { dryRun = false
   return changed
 }
 
-function main() {
+export function main() {
   const root = repoRoot()
   const dryRun = process.argv.includes('--dry-run')
   const changed = fixFrontmatter(root, loadConfig(root), { dryRun })
@@ -84,4 +85,4 @@ function main() {
   console.log(`${changed.length} document(s)${dryRun ? ' would be' : ''} restamped.`)
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) main()
+if (runDirect(import.meta.url)) main()

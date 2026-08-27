@@ -40,6 +40,7 @@ import { firstHeading, parseFrontmatter, renderFrontmatter } from './docs-frontm
 import { loadConfig } from './docs-config.mjs'
 import { kindForPath, moduleForPath, normalizeSegment, slugify, statusForKind } from './docs-taxonomy.mjs'
 import { lastCommitDate, listDocs, repoRoot } from './docs-fs.mjs'
+import { runDirect } from './docs-run.mjs'
 
 const DEFAULT_MAP = 'docs-migration.map.mjs'
 
@@ -95,7 +96,7 @@ function stampedContent(parsed, meta, body) {
  * `config.referenceScanExclude` is honoured here as well, and it has to be:
  * those paths name documents that deliberately do not exist — most importantly
  * THIS SYSTEM'S OWN TEST FIXTURES, which build throwaway trees under the default
- * tier map. Rewriting a fixture's `docs/engineering/x.md` to wherever the host
+ * tier map. Rewriting a fixture's `docs/engineering/…` path to wherever the host
  * project moved that file leaves the suite asserting against a path its own
  * configuration puts under no tier, and the tests fail for a reason that has
  * nothing to do with the migration.
@@ -149,7 +150,7 @@ function move(root, from, to) {
   }
 }
 
-async function main() {
+export async function main() {
   const apply = process.argv.includes('--apply')
   const root = repoRoot()
   const config = loadConfig(root)
@@ -240,4 +241,4 @@ async function main() {
   }
 }
 
-await main()
+if (runDirect(import.meta.url)) await main()

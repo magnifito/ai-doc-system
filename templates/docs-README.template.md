@@ -69,4 +69,4 @@ live replacement. The `test:scripts` script runs its tests. Advisory-only drift 
 pointers, `updated:` versus git) live in `check-docs-advisory.mjs`.
 
 The system this tree implements is `ai-doc-system` — design and rationale in that repository's
-`reference/design.md`.
+`docs/engineering/design.md`.

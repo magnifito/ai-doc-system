@@ -11,12 +11,19 @@ import test from 'node:test'
 import { listDocs } from './docs-fs.mjs'
 import { DEFAULTS, withDerived } from './docs-config.mjs'
 
-test('a symlinked directory is not followed, so a cycle cannot hang the walk', () => {
+test('a symlinked directory is not followed, so a cycle cannot hang the walk', (t) => {
   const root = mkdtempSync(join(tmpdir(), 'docs-fs-'))
   try {
     mkdirSync(join(root, 'docs/engineering'), { recursive: true })
     writeFileSync(join(root, 'docs/engineering/a.md'), '# A\n')
-    symlinkSync(join(root, 'docs'), join(root, 'docs/engineering/loop'))
+    try {
+      symlinkSync(join(root, 'docs'), join(root, 'docs/engineering/loop'))
+    } catch (error) {
+      // Windows denies symlink creation without developer mode; the behaviour
+      // under test is POSIX-reachable, so skipping there is honest.
+      if (error.code === 'EPERM') return t.skip('symlinks not permitted on this runner')
+      throw error
+    }
     assert.deepEqual(listDocs(root, withDerived(DEFAULTS)), ['docs/engineering/a.md'])
   } finally {
     rmSync(root, { recursive: true, force: true })

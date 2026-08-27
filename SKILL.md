@@ -131,6 +131,6 @@ The migration is the easy half. These are the calls that decide whether the resu
 
 ## Reference
 
-- `reference/design.md` — the full design: problem, rejected alternatives, metadata schema, the
-  gate's six assertions, what it deliberately does not assert, known limitations, and the questions
+- `docs/engineering/design.md` — the full design: problem, rejected alternatives, metadata schema,
+  the gate's assertions, what it deliberately does not assert, known limitations, and the questions
   to settle per project.

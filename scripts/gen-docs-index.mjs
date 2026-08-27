@@ -16,6 +16,7 @@ import { parseFrontmatter } from './docs-frontmatter.mjs'
 import { DEFAULTS, loadConfig, withDerived } from './docs-config.mjs'
 import { isExempt, kindForPath, moduleForPath } from './docs-taxonomy.mjs'
 import { listDocs, repoRoot } from './docs-fs.mjs'
+import { runDirect } from './docs-run.mjs'
 
 export function buildIndex(root, config = loadConfig(root)) {
   const entries = []
@@ -211,7 +212,7 @@ export function renderIndex(root, config = loadConfig(root)) {
   return targets
 }
 
-function main() {
+export function main() {
   const root = repoRoot()
   const config = loadConfig(root)
   const targets = renderIndex(root, config)
@@ -238,4 +239,4 @@ function main() {
   process.exit(stale ? 1 : 0)
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) main()
+if (runDirect(import.meta.url)) main()

@@ -1,0 +1,73 @@
+/**
+ * Tests for the package CLI (`bin/cli.mjs`) — the entry point npm consumers
+ * run as `npx ai-doc-system <command>`. Driven through child processes, which
+ * also proves the scripts' run-direct guards fire only when intended.
+ *
+ * Run: node --test scripts/cli.test.mjs
+ */
+import { strict as assert } from 'node:assert'
+import { execFileSync } from 'node:child_process'
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import test from 'node:test'
+
+const PACKAGE_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
+const BIN = join(PACKAGE_ROOT, 'bin', 'cli.mjs')
+
+function cli(args, options = {}) {
+  return execFileSync(process.execPath, [BIN, ...args], { encoding: 'utf8', stdio: 'pipe', ...options })
+}
+
+/** A git repository containing exactly `files` (no commit needed). */
+function gitFixture(files) {
+  const root = mkdtempSync(join(tmpdir(), 'docs-cli-'))
+  for (const [path, content] of Object.entries(files)) {
+    mkdirSync(join(root, dirname(path)), { recursive: true })
+    writeFileSync(join(root, path), content)
+  }
+  execFileSync('git', ['init', '-q'], { cwd: root, stdio: 'pipe' })
+  return root
+}
+
+const GOOD = '---\ntitle: Quality gate\nkind: engineering\nstatus: active\nupdated: 2026-08-27\n---\n\n# Quality gate\n'
+
+test('--version prints the package version', () => {
+  const pkg = JSON.parse(readFileSync(join(PACKAGE_ROOT, 'package.json'), 'utf8'))
+  assert.equal(cli(['--version']).trim(), pkg.version)
+})
+
+test('an unknown command exits 2 and names the commands', () => {
+  try {
+    cli(['bogus'])
+    assert.fail('should have exited non-zero')
+  } catch (error) {
+    assert.equal(error.status, 2)
+    assert.match(`${error.stderr}`, /check/)
+  }
+})
+
+test('gen then check succeed in the invoking repository', () => {
+  const root = gitFixture({ 'docs/engineering/quality-gate.md': GOOD })
+  try {
+    cli(['gen'], { cwd: root })
+    assert.match(cli(['check'], { cwd: root }), /check-docs: OK/)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('advisory writes to GITHUB_STEP_SUMMARY when the variable is set', () => {
+  const root = gitFixture({
+    'docs/engineering/a.md':
+      '---\ntitle: A\nkind: engineering\nstatus: active\nupdated: 2026-08-27\ncode: src/nowhere.ts\n---\n\n# A\n',
+  })
+  try {
+    const summary = join(root, 'summary.md')
+    cli(['advisory'], { cwd: root, env: { ...process.env, GITHUB_STEP_SUMMARY: summary } })
+    assert.match(readFileSync(summary, 'utf8'), /dead `code:` pointer/)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})

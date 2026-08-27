@@ -20,12 +20,13 @@
  *
  * All three are worth knowing and none is worth blocking on.
  */
-import { readFileSync, existsSync } from 'node:fs'
+import { appendFileSync, readFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { parseFrontmatter } from './docs-frontmatter.mjs'
 import { loadConfig } from './docs-config.mjs'
 import { isExempt, kindForPath } from './docs-taxonomy.mjs'
 import { lastCommitDate, listDocs, repoRoot } from './docs-fs.mjs'
+import { runDirect } from './docs-run.mjs'
 
 /**
  * The drift list is capped: any commit that touches many documents at once — the
@@ -34,7 +35,26 @@ import { lastCommitDate, listDocs, repoRoot } from './docs-fs.mjs'
  */
 const DRIFT_CAP = 20
 
-function main() {
+/**
+ * Print each line, and collect it: in CI nobody reads a green job's stdout, so
+ * when GITHUB_STEP_SUMMARY is set the same report is appended there and drift
+ * becomes visible on the run page without blocking anything.
+ */
+function reporter() {
+  const lines = []
+  const emit = (line) => {
+    console.log(line)
+    lines.push(line)
+  }
+  emit.flush = () => {
+    const summary = process.env.GITHUB_STEP_SUMMARY
+    if (!summary) return
+    appendFileSync(summary, `### docs advisory\n\n\`\`\`\n${lines.join('\n')}\n\`\`\`\n`)
+  }
+  return emit
+}
+
+export function main() {
   const root = repoRoot()
   const config = loadConfig(root)
   const deadCode = []
@@ -65,31 +85,34 @@ function main() {
     }
   }
 
-  if (deadCode.length === 0) console.log('docs advisory: every `code:` pointer resolves')
+  const emit = reporter()
+
+  if (deadCode.length === 0) emit('docs advisory: every `code:` pointer resolves')
   else {
-    console.log(`docs advisory: ${deadCode.length} dead \`code:\` pointer(s)`)
-    for (const { path, target } of deadCode) console.log(`  ${path} -> ${target}`)
+    emit(`docs advisory: ${deadCode.length} dead \`code:\` pointer(s)`)
+    for (const { path, target } of deadCode) emit(`  ${path} -> ${target}`)
   }
 
-  if (drifted.length === 0) console.log('docs advisory: no `updated:` drift')
+  if (drifted.length === 0) emit('docs advisory: no `updated:` drift')
   else {
-    console.log(`docs advisory: ${drifted.length} doc(s) committed after their \`updated:\` date`)
+    emit(`docs advisory: ${drifted.length} doc(s) committed after their \`updated:\` date`)
     for (const { path, stamped, committed } of drifted.slice(0, DRIFT_CAP)) {
-      console.log(`  ${path} — frontmatter ${stamped}, last commit ${committed}`)
+      emit(`  ${path} — frontmatter ${stamped}, last commit ${committed}`)
     }
-    if (drifted.length > DRIFT_CAP) console.log(`  … and ${drifted.length - DRIFT_CAP} more`)
+    if (drifted.length > DRIFT_CAP) emit(`  … and ${drifted.length - DRIFT_CAP} more`)
   }
 
-  if (unverified.length === 0) console.log('docs advisory: no verification drift')
+  if (unverified.length === 0) emit('docs advisory: no verification drift')
   else {
-    console.log(`docs advisory: ${unverified.length} state doc(s) whose code changed after \`verified_on\``)
+    emit(`docs advisory: ${unverified.length} state doc(s) whose code changed after \`verified_on\``)
     for (const { path, verified, code, moved } of unverified.slice(0, DRIFT_CAP)) {
-      console.log(`  ${path} — verified ${verified}, ${code} changed ${moved}`)
+      emit(`  ${path} — verified ${verified}, ${code} changed ${moved}`)
     }
-    if (unverified.length > DRIFT_CAP) console.log(`  … and ${unverified.length - DRIFT_CAP} more`)
+    if (unverified.length > DRIFT_CAP) emit(`  … and ${unverified.length - DRIFT_CAP} more`)
   }
 
+  emit.flush()
   process.exit(0)
 }
 
-main()
+if (runDirect(import.meta.url)) main()

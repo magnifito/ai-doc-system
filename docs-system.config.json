@@ -1,0 +1,11 @@
+{
+  "referenceScanExclude": [
+    ".claude",
+    ".agents",
+    "_bmad",
+    "skills-lock.json",
+    "scripts/*.test.mjs",
+    "docs-migration.map.mjs",
+    "templates"
+  ]
+}

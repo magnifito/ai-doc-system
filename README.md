@@ -28,7 +28,8 @@ into an explicitly non-binding idea bank, and it is checkable by machine.
 | `scripts/*.test.mjs` | The test suite, over throwaway fixture trees, some of them real git repositories. Wire it in — a suite no runner executes is green exactly once. |
 | `SKILL.md` | The agent-facing procedure, including the judgement calls the mechanics do not cover. |
 | `templates/` | The migration map to fill in, and the `docs/README.md` contract to adapt. |
-| `reference/` | The full design: the problem, the two rejected alternatives, and the limitations that survived implementation. |
+| `bin/cli.mjs` | Package entry point — `ai-doc-system check\|gen\|fix\|advisory\|migrate` — for npm-based installs. |
+| `docs/` | This repo's own gated tree; `engineering/design.md` is the full design: the problem, the two rejected alternatives, and the limitations that survived implementation. |
 
 Plain ESM, Node 20+, one dependency: the `yaml` package — frontmatter holds lists and colon-bearing
 scalars that a hand-rolled parser mangled. Installing into a host repo means copying the scripts
@@ -118,7 +119,7 @@ unaffected by any of this.
 9. No two documents in one tier (and module) share a basename — sentinels excepted.
 
 And what it deliberately does **not** assert — document age, prose style, whether `code:` still
-resolves, whether `updated:` matches git — is argued in [`reference/design.md`](reference/design.md)
+resolves, whether `updated:` matches git — is argued in [`docs/engineering/design.md`](docs/engineering/design.md)
 §5.3. A gate that cries wolf gets bypassed.
 
 ## Using it
@@ -150,5 +151,5 @@ rm docs-migration.map.mjs scripts/migrate-docs.mjs
 
 Designed and first applied to a 301-document monorepo in August 2026, where 208 of those documents
 were captured from elsewhere and indistinguishable from committed scope until this ran.
-[`reference/design.md`](reference/design.md) carries the reasoning, the two rejected alternatives,
+[`docs/engineering/design.md`](docs/engineering/design.md) carries the reasoning, the two rejected alternatives,
 and the limitations that survived implementation.

@@ -1,3 +1,10 @@
+---
+title: "Design: a documentation system for agent-built repositories"
+kind: engineering
+status: active
+updated: 2026-08-27
+---
+
 # Design: a documentation system for agent-built repositories
 
 - **Status:** implemented, and in use

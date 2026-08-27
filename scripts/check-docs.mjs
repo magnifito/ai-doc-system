@@ -30,6 +30,7 @@
 import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join, dirname, resolve, relative } from 'node:path'
+import { runDirect } from './docs-run.mjs'
 import { parseFrontmatter } from './docs-frontmatter.mjs'
 import { loadConfig } from './docs-config.mjs'
 import { isExempt, kindForPath, moduleForPath, pathHygieneErrors, reservedStatuses, statusForKind } from './docs-taxonomy.mjs'
@@ -68,6 +69,8 @@ export function checkDocs(root, config = loadConfig(root)) {
   const violations = []
   const changeTargets = []
   const basenames = new Map()
+  const listings = new Map()
+  const exists = (target) => existsCaseExact(root, target, listings)
   const add = (file, field, message) => violations.push({ file, field, message })
   const reserved = reservedStatuses(config)
 
@@ -201,14 +204,14 @@ export function checkDocs(root, config = loadConfig(root)) {
       const resolved = target.startsWith(`${config.docsDir}/`)
         ? target
         : relative(root, resolve(join(root, dirname(path)), target)).split(/[\\/]/).join('/')
-      if (!existsCaseExact(root, resolved)) add(path, 'link', `dead link -> ${target}`)
+      if (!exists(resolved)) add(path, 'link', `dead link -> ${target}`)
     }
   }
 
   // 8c, second pass. A `changes` target must exist AND be a reflection document;
   // a todo pointing at another todo describes no reality and can never close.
   for (const { path, target } of changeTargets) {
-    if (!existsCaseExact(root, target)) {
+    if (!exists(target)) {
       add(path, 'changes', `points at "${target}", which does not exist`)
       continue
     }
@@ -223,7 +226,7 @@ export function checkDocs(root, config = loadConfig(root)) {
   // covered by 5a link syntax; bare prose mentions inside the tree stay
   // unchecked because historical plans legitimately narrate old paths.
   for (const target of trackedDocRefs(root, config)) {
-    if (!existsCaseExact(root, target)) {
+    if (!exists(target)) {
       add('(repo)', 'link', `a tracked file references ${target}, which does not exist — git grep -l '${target}'`)
     }
   }
@@ -244,15 +247,22 @@ export function checkDocs(root, config = loadConfig(root)) {
  * its parent's real listing — a wrong-case directory in the middle of a link
  * is the same defect as a wrong-case basename.
  */
-function existsCaseExact(root, repoRelative) {
+function existsCaseExact(root, repoRelative, listings = new Map()) {
   if (!existsSync(join(root, repoRelative))) return false
   let dir = root
   for (const segment of repoRelative.split('/')) {
-    try {
-      if (!readdirSync(dir).includes(segment)) return false
-    } catch {
-      return false
+    // One readdir per directory per run, not per link — `listings` is shared
+    // across every target checkDocs resolves.
+    let names = listings.get(dir)
+    if (!names) {
+      try {
+        names = new Set(readdirSync(dir))
+      } catch {
+        names = new Set()
+      }
+      listings.set(dir, names)
     }
+    if (!names.has(segment)) return false
     dir = join(dir, segment)
   }
   return true
@@ -320,7 +330,7 @@ export function trackedDocRefs(root, config = loadConfig(root)) {
 
 const PRINT_CAP = 100
 
-function main() {
+export function main() {
   const violations = checkDocs(repoRoot())
   const cap = process.argv.includes('--all') ? Infinity : PRINT_CAP
   if (violations.length === 0) {
@@ -335,4 +345,4 @@ function main() {
   process.exit(1)
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) main()
+if (runDirect(import.meta.url)) main()
