@@ -124,7 +124,16 @@ resolves, whether `updated:` matches git — is argued in [`docs/engineering/des
 
 ## Using it
 
-Install as a skill and let an agent drive it:
+From npm:
+
+```bash
+npm install -D @puralex/ai-doc-system   # brings `yaml` with it
+npx ai-doc-system gen                   # regenerate INDEX.md and index.json
+npx ai-doc-system check                 # the blocking gate
+npx ai-doc-system advisory              # non-blocking drift report
+```
+
+Or install as a skill and let an agent drive it:
 
 ```bash
 git clone https://github.com/magnifito/ai-doc-system.git

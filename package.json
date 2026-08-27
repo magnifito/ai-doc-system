@@ -1,5 +1,5 @@
 {
-  "name": "ai-doc-system",
+  "name": "@puralex/ai-doc-system",
   "version": "1.1.0",
   "description": "Tier a repository's docs by authority, validate frontmatter, generate an agent-readable index, and enforce it with a blocking gate.",
   "type": "module",
@@ -10,6 +10,9 @@
   },
   "engines": {
     "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "bin": {
     "ai-doc-system": "bin/cli.mjs"
