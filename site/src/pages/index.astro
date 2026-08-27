@@ -207,8 +207,9 @@ const description =
             Your agent surveys the tree, proposes the moves, stamps every badge, and wires the gate
             in. The skill encodes the judgement calls, not just the mechanics.
           </p>
-<pre><code><span class="prompt">$</span> git clone https://github.com/magnifito/ai-doc-system.git
-<span class="prompt">$</span> ln -s "$PWD/ai-doc-system" ~/.claude/skills/ai-doc-system
+<pre><code><span class="c"># in Claude Code:</span>
+<span class="prompt">&gt;</span> /plugin marketplace add magnifito/ai-doc-system
+<span class="prompt">&gt;</span> /plugin install ai-doc-system@magnifito
 <span class="c"># then, in your repository:</span>
 <span class="prompt">&gt;</span> set up the documentation system in this repo</code></pre>
         </div>
@@ -216,6 +217,7 @@ const description =
         <div class="path">
           <h3>From npm — just the tooling</h3>
 <pre><code><span class="prompt">$</span> npm install -D @puralex/ai-doc-system
+<span class="prompt">$</span> npx ai-doc-system init       <span class="c"># fresh tree, gate-clean</span>
 <span class="prompt">$</span> npx ai-doc-system gen        <span class="c"># the map</span>
 <span class="prompt">$</span> npx ai-doc-system check      <span class="c"># the gate</span>
 <span class="prompt">$</span> npx ai-doc-system advisory   <span class="c"># drift report</span></code></pre>
