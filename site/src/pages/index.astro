@@ -27,7 +27,30 @@ const description =
     <meta name="description" content={description} />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://magnifito.github.io/ai-doc-system/" />
+    <meta property="og:image" content="https://magnifito.github.io/ai-doc-system/og.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content="https://magnifito.github.io/ai-doc-system/og.png" />
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='0.9em' font-size='90'>⛩️</text></svg>" />
+    <script
+      type="application/ld+json"
+      set:html={JSON.stringify({
+        '@context': 'https://schema.org',
+        '@type': 'SoftwareApplication',
+        name: 'ai-doc-system',
+        description,
+        applicationCategory: 'DeveloperApplication',
+        operatingSystem: 'macOS, Linux, Windows',
+        url: 'https://magnifito.github.io/ai-doc-system/',
+        downloadUrl: 'https://www.npmjs.com/package/@puralex/ai-doc-system',
+        codeRepository: 'https://github.com/magnifito/ai-doc-system',
+        license: 'https://www.apache.org/licenses/LICENSE-2.0',
+        offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+      })}
+    />
   </head>
   <body>
     <!-- stage 1 · the hook. The page is itself a document in the system: each

@@ -1,0 +1,30 @@
+# ai-doc-system
+
+> A documentation system for repositories whose primary reader is an AI agent. Docs are tiered by
+> authority (reference / product / engineering / plans / archive), every file carries validated YAML
+> frontmatter, an agent-readable index (docs/index.json) is generated, and a blocking gate keeps all
+> of it true. The core field is `status: reference` — it makes "not a commitment" machine-detectable,
+> so an agent never implements a captured competitor spec as if it were committed scope.
+
+Install: `npm install -D @puralex/ai-doc-system`, then `npx ai-doc-system init` (greenfield) or the
+migration procedure in SKILL.md (existing tree). Claude Code plugin:
+`/plugin marketplace add magnifito/ai-doc-system`.
+
+Agent rule for any repo using this system: read `docs/index.json` first and filter by `kind` and
+`status`; never grep `docs/` blind. Nothing with `status: reference` may be implemented directly —
+promote it into `product/` first.
+
+## Docs
+
+- [README](https://github.com/magnifito/ai-doc-system/blob/main/README.md): what you get, the
+  default tiers, the frontmatter schema, the nine gate assertions, install routes.
+- [SKILL.md](https://github.com/magnifito/ai-doc-system/blob/main/SKILL.md): the agent-facing
+  procedure — survey, install, migrate, and the judgement calls the mechanics do not cover.
+- [Design](https://github.com/magnifito/ai-doc-system/blob/main/docs/engineering/design.md): the
+  full design — the problem, rejected alternatives, what the gate deliberately does not assert.
+
+## Package
+
+- [npm: @puralex/ai-doc-system](https://www.npmjs.com/package/@puralex/ai-doc-system): CLI commands
+  `init`, `check`, `gen`, `fix`, `advisory`, `migrate`. Node 20+, one dependency (`yaml`).
+- [GitHub](https://github.com/magnifito/ai-doc-system): Apache-2.0.
