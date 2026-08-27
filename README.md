@@ -153,3 +153,7 @@ Designed and first applied to a 301-document monorepo in August 2026, where 208 
 were captured from elsewhere and indistinguishable from committed scope until this ran.
 [`docs/engineering/design.md`](docs/engineering/design.md) carries the reasoning, the two rejected alternatives,
 and the limitations that survived implementation.
+
+## License
+
+[Apache-2.0](LICENSE).

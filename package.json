@@ -3,8 +3,7 @@
   "version": "1.1.0",
   "description": "Tier a repository's docs by authority, validate frontmatter, generate an agent-readable index, and enforce it with a blocking gate.",
   "type": "module",
-  "license": "UNLICENSED",
-  "private": true,
+  "license": "Apache-2.0",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/magnifito/ai-doc-system.git"
