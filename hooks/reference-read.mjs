@@ -11,20 +11,26 @@
  * `{ hookSpecificOutput: { hookEventName, additionalContext } }` and exiting 0;
  * `permissionDecision` is deliberately omitted so the Read proceeds untouched.
  *
- * The whole body is wrapped so this hook can only ever exit 0 with nothing to
- * say: a hook that throws interrupts the user's tool call with a stack trace,
- * which is a worse outcome than a missing reminder.
+ * EVERYTHING, imports included, is inside the `try`, and every import is
+ * dynamic. A plugin install is a bare git checkout with no node_modules, so a
+ * static `import` of the engine (which needs `yaml`) would throw at module
+ * load — before any handler could catch it — and put a stack trace on the
+ * user's every Read. `hooks/engine.mjs` decides which copy of the engine to
+ * run, and answers null when there is none; then this hook exits 0 in silence.
  */
-import { existsSync, readFileSync } from 'node:fs'
-import { isAbsolute, join, relative } from 'node:path'
-import { parseFrontmatter } from '../scripts/docs-frontmatter.mjs'
-import { loadConfig } from '../scripts/docs-config.mjs'
-
 try {
+  const { existsSync, readFileSync } = await import('node:fs')
+  const { isAbsolute, join, relative } = await import('node:path')
+  const { engineRoot, importEngine } = await import('./engine.mjs')
+
   const payload = JSON.parse(readFileSync(0, 'utf8') || '{}')
   const file = payload.tool_input?.file_path
   const root = payload.cwd ?? process.cwd()
-  if (file && `${file}`.endsWith('.md')) {
+  const engine = engineRoot(root)
+  if (engine && file && `${file}`.endsWith('.md')) {
+    const { parseFrontmatter } = await importEngine(engine, 'scripts/docs-frontmatter.mjs')
+    const { loadConfig } = await importEngine(engine, 'scripts/docs-config.mjs')
+    const { kindForPath } = await importEngine(engine, 'scripts/docs-taxonomy.mjs')
     const full = isAbsolute(file) ? file : join(root, file)
     const rel = relative(root, full).split(/[\\/]/).join('/')
     let config
@@ -38,7 +44,15 @@ try {
       // gate reports that defect; the reminder stays silent rather than half-right.
       const { data } = parseFrontmatter(readFileSync(full, 'utf8'))
       if (data.status === 'reference') {
-        const context = `${rel} has status: reference — captured from elsewhere, NOT a commitment, never a build spec. Do not implement from it. To act on it, promote it first: ai-doc-system mv ${rel} ${config.docsDir}/product/<name>.md, then rewrite the prose.`
+        // Where to promote it TO is the project's tiering, not this hook's: the
+        // first configured tier that is not the document's own. A project with
+        // one tier gets the neutral wording instead of an invented path.
+        const ownKind = kindForPath(config, rel)
+        const destination = config.tiers.find(([, kind]) => kind !== ownKind)
+        const promote = destination
+          ? `To act on it, promote it first: ai-doc-system mv ${rel} ${config.docsDir}/${destination[0]}<name>.md, then rewrite the prose.`
+          : 'To act on it, promote it into a higher tier first with `ai-doc-system mv`, then rewrite the prose.'
+        const context = `${rel} has status: reference — captured from elsewhere, NOT a commitment, never a build spec. Do not implement from it. ${promote}`
         process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: 'PreToolUse', additionalContext: context } }))
       }
     }

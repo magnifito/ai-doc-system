@@ -16,9 +16,10 @@ import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'nod
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import test from 'node:test'
-import { checkDocs } from './check-docs.mjs'
+import { checkDocs, escapeData, escapeProperty } from './check-docs.mjs'
 import { buildIndex, renderMarkdown, renderIndex } from './gen-docs-index.mjs'
 import { DEFAULTS, RULES, clearConfigCache, loadConfig, withDerived } from './docs-config.mjs'
+import { LIST_FIELDS } from './docs-frontmatter.mjs'
 
 
 /**
@@ -50,7 +51,7 @@ function run(files, options) {
     return checkDocs(
       root,
       options?.config
-        ? withDerived({ ...DEFAULTS, ...options.config, rules: { ...RULES, ...(options.config.rules ?? {}) } })
+        ? withDerived({ ...DEFAULTS, ...options.config, rules: { ...RULES, ...options.config.rules } })
         : undefined,
     )
   } finally {
@@ -281,7 +282,9 @@ const MODULE_CONFIG = {
   tierStatus: { reference: 'reference', archive: 'superseded' },
   tierOrder: ['state', 'todo', 'reference', 'archive'],
   indexSubdivide: [],
-  exempt: ['INDEX.md', 'README.md', 'ROADMAP.md', 'modules/*/README.md'],
+  // No `exempt` override: `ROADMAP.md` and `modules/*/README.md` are generated
+  // by `gen` as soon as modules are configured, so the DEFAULTS have to cover
+  // them. A hand-copied list here would hide the gap from every other project.
   modules: [
     { key: 'core', class: 'core', requires: [] },
     { key: 'crm', class: 'anchor', requires: [] },
@@ -733,10 +736,51 @@ test('15b. review_by in the past is a warning; in the future it is silent', () =
 test('15c. with no options, `now` defaults to the real clock', () => {
   const root = fixture({
     'docs/engineering/x.md': doc({ title: 'X', kind: 'engineering', status: 'active', updated: '2026-08-01', review_by: '2999-01-01' }),
+    // Both directions against the real clock: a date absence alone would pass
+    // just as well if the rule had stopped firing altogether.
+    'docs/engineering/y.md': doc({ title: 'Y', kind: 'engineering', status: 'active', updated: '2000-01-01', review_by: '2000-01-02' }),
   })
   try {
-    assert.ok(!checkDocs(root).some((v) => v.rule === 'review'))
+    const violations = checkDocs(root)
+    assert.deepEqual(violations.filter((v) => v.rule === 'review').map((v) => v.file), ['docs/engineering/y.md'])
   } finally {
     rmSync(root, { recursive: true, force: true })
   }
+})
+
+test('a tree with modules configured is clean straight after `gen` — its generated artefacts are exempt', () => {
+  const violations = runModular({
+    'docs/modules/crm/state/pipelines.md': STATE_DOC,
+  })
+  assert.deepEqual(violations, [])
+})
+
+// ── the report surface: workflow-command escaping and the rule vocabulary ────
+
+test('github annotations encode % first, then the data and property characters', () => {
+  // `%` first, or the encoder would re-encode the escapes it just wrote.
+  assert.equal(escapeData('%0A'), '%250A')
+  assert.equal(escapeData('100% of the time'), '100%25 of the time')
+  assert.equal(escapeData('a\r\nb'), 'a%0D%0Ab')
+  // A property list is delimited by `,` and `:`, so a value carrying either one
+  // would forge a property — `file=a,title=b` out of a single file name.
+  assert.equal(escapeProperty('docs/engineering/a,b:c.md'), 'docs/engineering/a%2Cb%3Ac.md')
+  assert.equal(escapeProperty('%,:'), '%25%2C%3A')
+  // The data half deliberately leaves them alone: the message is the last field
+  // on the line and has no list to break out of.
+  assert.equal(escapeData('a,b:c'), 'a,b:c')
+})
+
+test('every rule id the gate can emit is a key of RULES', () => {
+  const source = readFileSync(new URL('./check-docs.mjs', import.meta.url), 'utf8')
+  // The lookbehind keeps `refs.add(...)` — a Set, not the violation collector —
+  // out of the scan.
+  const ids = new Set([...source.matchAll(/(?<![.\w])add\('([a-z-]+)'/g)].map((match) => match[1]))
+  // One `add` call passes the FIELD name as the rule id — the list-shape check,
+  // which is why `evidence` and `changes` are rule ids as well as fields.
+  for (const field of LIST_FIELDS) ids.add(field)
+  const dynamic = [...source.matchAll(/(?<![.\w])add\((?!')/g)]
+  assert.equal(dynamic.length, 1, 'a new dynamic add() call must have its rule ids listed here')
+  assert.ok(ids.size >= 15, `only found ${ids.size} rule ids — the scan has stopped matching`)
+  for (const id of ids) assert.ok(id in RULES, `check-docs emits "${id}", which RULES does not define`)
 })

@@ -32,9 +32,15 @@ jobs:
           node-version: ${{ matrix.node }}
       - run: npm ci
       - run: npm test
-      - run: npm run lint:docs
-      - run: npm run lint:docs:advisory
+      # One gate step, not two: `--format github` exits exactly as the plain
+      # run does and annotates the offending files on failure, so running the
+      # gate twice only doubled the time it takes to fail.
       - run: npm run lint:docs -- --format github
+      # The history-aware rules (`transition`, `promoted-verbatim`) need a base
+      # ref, so this repository dogfoods them on every pull request.
+      - run: node scripts/check-docs.mjs --base origin/main
+        if: github.event_name == 'pull_request'
+      - run: npm run lint:docs:advisory
       - run: node scripts/impact-docs.mjs --base origin/main
         if: github.event_name == 'pull_request'
 
@@ -64,3 +70,16 @@ jobs:
           npx ai-doc-system gen
           npx ai-doc-system check
           npx ai-doc-system advisory
+          # Every command the CLI exposes, driven from the INSTALLED tarball:
+          # a `files` entry left out, or a script the dispatcher cannot reach,
+          # shows up here and nowhere else.
+          npx ai-doc-system new docs/product/hello.md --title Hello --summary "First doc."
+          git add -A
+          git -c user.name=ci -c user.email=ci@example.com commit -qm smoke
+          npx ai-doc-system mv docs/product/hello.md docs/engineering/hello.md
+          npx ai-doc-system gen
+          npx ai-doc-system check
+          npx ai-doc-system verify
+          npx ai-doc-system impact
+          npx ai-doc-system context --kind engineering
+          npx ai-doc-system export | head -1

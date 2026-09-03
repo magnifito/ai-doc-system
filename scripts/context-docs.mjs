@@ -151,7 +151,7 @@ export function parseArgs(args) {
   const options = { paths: [] }
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index]
-    if (VALUE_FLAGS[arg]) {
+    if (Object.hasOwn(VALUE_FLAGS, arg)) {
       const value = args[index + 1]
       // `--kind --status active` would otherwise read as "kind is --status",
       // which selects nothing and looks like an empty tree.

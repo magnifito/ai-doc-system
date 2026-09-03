@@ -22,6 +22,7 @@ import { today } from './docs-dates.mjs'
 import { repoRoot } from './docs-fs.mjs'
 import { writeIndex } from './gen-docs-index.mjs'
 import { runDirect } from './docs-run.mjs'
+import { flagValues } from './docs-args.mjs'
 
 /**
  * @returns {{ from: string, to: string, restamped: { kind: string, module: string|null, status: string } }}
@@ -73,15 +74,9 @@ export function mvDoc(root, from, to, { status, now } = {}, config = loadConfig(
   return { from, to, restamped: { kind, module: moduleKey, status: nextStatus } }
 }
 
-function flagValue(name) {
-  const index = process.argv.indexOf(name)
-  return index === -1 ? undefined : process.argv[index + 1]
-}
-
 /**
- * The `.md` positionals, in order. Flags consume the argument after them, and
- * the leading command word (`mv`, when dispatched through `cli/cli.mjs`) is
- * not a path — so a document is recognised by its extension, not its position.
+ * The `.md` positionals, in order. Flags consume the argument after them, so a
+ * document is recognised by its extension, not by its position.
  */
 function docPaths() {
   const args = process.argv.slice(2)
@@ -94,13 +89,14 @@ function docPaths() {
 }
 
 export function main() {
+  const status = flagValues('mv', process.argv, ['--status'])['--status']
   const [from, to] = docPaths()
   if (!from || !to) {
     console.error('usage: ai-doc-system mv <from.md> <to.md> [--status <status>]')
     process.exit(2)
   }
   try {
-    const { restamped } = mvDoc(repoRoot(), from, to, { status: flagValue('--status') })
+    const { restamped } = mvDoc(repoRoot(), from, to, { status })
     console.log(`moved ${from} -> ${to} (kind ${restamped.kind}, status ${restamped.status})`)
     console.log('Now rewrite the prose to describe this product; promoted_from records where it came from.')
   } catch (error) {

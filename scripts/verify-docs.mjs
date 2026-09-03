@@ -21,6 +21,7 @@ import { today } from './docs-dates.mjs'
 import { existsCaseExact, listDocs, repoRoot } from './docs-fs.mjs'
 import { writeIndex } from './gen-docs-index.mjs'
 import { runDirect } from './docs-run.mjs'
+import { flagValues } from './docs-args.mjs'
 
 export const LOCK_FILE = 'evidence-lock.json'
 
@@ -73,12 +74,30 @@ export function hashEvidence(root, { path, from, to }) {
   return createHash('sha256').update(text).digest('hex')
 }
 
-/** The committed lock, or an empty one. A missing lock means nothing is locked yet. */
+/**
+ * The committed lock, or an empty one. A missing lock means nothing is locked
+ * yet; an UNREADABLE one is a defect to report, not to crash on. A conflict
+ * marker left in the file used to take down the gate and both hooks with an
+ * unhandled SyntaxError, from a file no author is expected to edit by hand — so
+ * a broken lock reads as empty and carries `error` for the callers to surface.
+ */
 export function readLock(root, config) {
   const file = join(root, config.docsDir, LOCK_FILE)
   if (!existsSync(file)) return { generated: GENERATED_BY, entries: {} }
-  return JSON.parse(readFileSync(file, 'utf8'))
+  try {
+    const parsed = JSON.parse(readFileSync(file, 'utf8'))
+    return { generated: GENERATED_BY, entries: parsed?.entries ?? {} }
+  } catch {
+    return {
+      generated: GENERATED_BY,
+      entries: {},
+      error: `${config.docsDir}/${LOCK_FILE} ${LOCK_UNREADABLE}`,
+    }
+  }
 }
+
+/** The tail of the unreadable-lock message; the gate prefixes the path itself. */
+export const LOCK_UNREADABLE = 'is not valid JSON — delete it and re-run `ai-doc-system verify`'
 
 /**
  * Run one command entry. `stdio: 'pipe'` keeps a chatty check out of the report;
@@ -167,14 +186,19 @@ export function verifyDocs(root, { only, stamp = false, now, run = runCommand } 
   return { results, stamped, matched }
 }
 
-function flagValue(name) {
-  const index = process.argv.indexOf(name)
-  return index === -1 ? undefined : process.argv[index + 1]
-}
-
 export function main() {
-  const only = flagValue('--only')
-  const { results, stamped, matched } = verifyDocs(repoRoot(), { only, stamp: process.argv.includes('--stamp') })
+  const only = flagValues('verify', process.argv, ['--only'])['--only']
+  const root = repoRoot()
+  const config = loadConfig(root)
+  // A lock this command cannot read must not be silently overwritten: it holds
+  // rows for documents this run may not even look at (`--only`), and rewriting
+  // it would drop them without saying so.
+  const lock = readLock(root, config)
+  if (lock.error) {
+    console.error(`verify: ${lock.error}`)
+    process.exit(1)
+  }
+  const { results, stamped, matched } = verifyDocs(root, { only, stamp: process.argv.includes('--stamp') }, config)
   if (matched === 0 && only) {
     console.error(`verify: no document matched --only ${only}`)
     process.exit(2)

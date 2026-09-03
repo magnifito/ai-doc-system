@@ -17,6 +17,7 @@ import { loadConfig } from './docs-config.mjs'
 import { buildByCode, buildIndex } from './gen-docs-index.mjs'
 import { changedPaths, repoRoot } from './docs-fs.mjs'
 import { runDirect } from './docs-run.mjs'
+import { flagValues } from './docs-args.mjs'
 
 /** A changed path is covered by a claim when it equals the claim or lies beneath it. */
 function covers(claim, changed) {
@@ -51,16 +52,12 @@ export function impactedDocs(root, changed, config = loadConfig(root)) {
   return hits.sort((a, b) => (a.doc < b.doc ? -1 : a.doc > b.doc ? 1 : 0))
 }
 
-function flagValue(name) {
-  const index = process.argv.indexOf(name)
-  return index === -1 ? undefined : process.argv[index + 1]
-}
-
 export function main() {
   const root = repoRoot()
+  const base = flagValues('impact', process.argv, ['--base'])['--base']
   let changed
   try {
-    changed = changedPaths(root, flagValue('--base'))
+    changed = changedPaths(root, base)
   } catch (error) {
     // An unresolvable `--base` is a checkout problem, not a docs problem. This
     // pass is advisory: say what went wrong and get out of the build's way.

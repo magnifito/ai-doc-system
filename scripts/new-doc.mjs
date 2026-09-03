@@ -16,6 +16,7 @@ import { today } from './docs-dates.mjs'
 import { repoRoot } from './docs-fs.mjs'
 import { writeIndex } from './gen-docs-index.mjs'
 import { runDirect } from './docs-run.mjs'
+import { flagValues } from './docs-args.mjs'
 
 /**
  * @returns {{ path: string, frontmatter: string }} the document written, with
@@ -57,15 +58,9 @@ export function newDoc(root, path, { title, summary, status, now } = {}, config 
   return { path, frontmatter }
 }
 
-function flagValue(name) {
-  const index = process.argv.indexOf(name)
-  return index === -1 ? undefined : process.argv[index + 1]
-}
-
 /**
- * The `.md` positionals, in order. Flags consume the argument after them, and
- * the leading command word (`new`, when dispatched through `cli/cli.mjs`) is
- * not a path — so a document is recognised by its extension, not its position.
+ * The `.md` positionals, in order. Flags consume the argument after them, so a
+ * document is recognised by its extension, not by its position.
  */
 function docPaths() {
   const args = process.argv.slice(2)
@@ -78,6 +73,7 @@ function docPaths() {
 }
 
 export function main() {
+  const flags = flagValues('new', process.argv, ['--title', '--summary', '--status'])
   const [path] = docPaths()
   if (!path) {
     console.error('usage: ai-doc-system new docs/<tier>/<name>.md [--title "..."] [--summary "..."] [--status <status>]')
@@ -85,9 +81,9 @@ export function main() {
   }
   try {
     const { frontmatter } = newDoc(repoRoot(), path, {
-      title: flagValue('--title'),
-      summary: flagValue('--summary'),
-      status: flagValue('--status'),
+      title: flags['--title'],
+      summary: flags['--summary'],
+      status: flags['--status'],
     })
     console.log(`created ${path}\n${frontmatter}`)
   } catch (error) {

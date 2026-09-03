@@ -33,6 +33,11 @@ function withFixture(files, config, body) {
   try {
     return body(root)
   } finally {
+    // The cache is keyed by root, and several bodies below write a config file
+    // and call `loadConfig` — leaving a resolved config behind for a directory
+    // that no longer exists. Cheap to clear, and it keeps one test from
+    // deciding what the next one reads.
+    clearConfigCache()
     rmSync(root, { recursive: true, force: true })
   }
 }
@@ -209,23 +214,31 @@ test('rules: defaults carry every known id at its default severity', () => {
 
 test('rules: an override changes one severity and keeps the rest', () => {
   const root = mkdtempSync(join(tmpdir(), 'docs-config-'))
-  writeFileSync(join(root, 'docs-system.config.json'), JSON.stringify({ rules: { basename: 'warn' } }))
-  clearConfigCache()
-  const config = loadConfig(root)
-  assert.equal(config.rules.basename, 'warn')
-  assert.equal(config.rules.link, 'error')
-  rmSync(root, { recursive: true, force: true })
+  try {
+    writeFileSync(join(root, 'docs-system.config.json'), JSON.stringify({ rules: { basename: 'warn' } }))
+    clearConfigCache()
+    const config = loadConfig(root)
+    assert.equal(config.rules.basename, 'warn')
+    assert.equal(config.rules.link, 'error')
+  } finally {
+    clearConfigCache()
+    rmSync(root, { recursive: true, force: true })
+  }
 })
 
 test('rules: an unknown id or severity is rejected', () => {
   const root = mkdtempSync(join(tmpdir(), 'docs-config-'))
-  writeFileSync(join(root, 'docs-system.config.json'), JSON.stringify({ rules: { bogus: 'error' } }))
-  clearConfigCache()
-  assert.throws(() => loadConfig(root), /unknown rule "bogus"/)
-  writeFileSync(join(root, 'docs-system.config.json'), JSON.stringify({ rules: { link: 'loud' } }))
-  clearConfigCache()
-  assert.throws(() => loadConfig(root), /severity "loud"/)
-  rmSync(root, { recursive: true, force: true })
+  try {
+    writeFileSync(join(root, 'docs-system.config.json'), JSON.stringify({ rules: { bogus: 'error' } }))
+    clearConfigCache()
+    assert.throws(() => loadConfig(root), /unknown rule "bogus"/)
+    writeFileSync(join(root, 'docs-system.config.json'), JSON.stringify({ rules: { link: 'loud' } }))
+    clearConfigCache()
+    assert.throws(() => loadConfig(root), /severity "loud"/)
+  } finally {
+    clearConfigCache()
+    rmSync(root, { recursive: true, force: true })
+  }
 })
 
 

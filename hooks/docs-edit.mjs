@@ -18,23 +18,28 @@
  * file just written. Context is added by printing
  * `{ hookSpecificOutput: { hookEventName, additionalContext } }` and exiting 0.
  *
- * The whole body is wrapped so this hook can only ever exit 0 with nothing to
- * say: a hook that throws interrupts the user's tool call with a stack trace,
- * which is a worse outcome than a missing report.
+ * EVERYTHING, imports included, is inside the `try`, and every import is
+ * dynamic. A plugin install is a bare git checkout with no node_modules, so a
+ * static `import` of the engine (which needs `yaml`) would throw at module
+ * load — before any handler could catch it — and put a stack trace on the
+ * user's every Write. `hooks/engine.mjs` decides which copy of the engine to
+ * run, and answers null when there is none; then this hook exits 0 in silence.
  */
-import { existsSync, readFileSync } from 'node:fs'
-import { isAbsolute, join, relative } from 'node:path'
-import { checkDocs } from '../scripts/check-docs.mjs'
-import { loadConfig } from '../scripts/docs-config.mjs'
-
-/** The gate can find hundreds of issues in a stale tree; a hook says the first few. */
-const CAP = 20
-
 try {
+  const { existsSync, readFileSync } = await import('node:fs')
+  const { isAbsolute, join, relative } = await import('node:path')
+  const { engineRoot, importEngine } = await import('./engine.mjs')
+
+  /** The gate can find hundreds of issues in a stale tree; a hook says the first few. */
+  const CAP = 20
+
   const payload = JSON.parse(readFileSync(0, 'utf8') || '{}')
   const file = payload.tool_input?.file_path
   const root = payload.cwd ?? process.cwd()
-  if (file && `${file}`.endsWith('.md')) {
+  const engine = engineRoot(root)
+  if (engine && file && `${file}`.endsWith('.md')) {
+    const { checkDocs } = await importEngine(engine, 'scripts/check-docs.mjs')
+    const { loadConfig } = await importEngine(engine, 'scripts/docs-config.mjs')
     const full = isAbsolute(file) ? file : join(root, file)
     const rel = relative(root, full).split(/[\\/]/).join('/')
     let config

@@ -7,8 +7,8 @@
  * Run: node --test scripts/hooks.test.mjs
  */
 import { strict as assert } from 'node:assert'
-import { execFileSync } from 'node:child_process'
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
+import { execFileSync, spawnSync } from 'node:child_process'
+import { cpSync, existsSync, mkdtempSync, mkdirSync, readFileSync, symlinkSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -162,5 +162,129 @@ test('a malformed payload exits 0 with empty stdout', () => {
   for (const name of ['reference-read.mjs', 'docs-edit.mjs']) {
     const out = execFileSync(process.execPath, [join(PACKAGE_ROOT, 'hooks', name)], { input: 'not json at all', encoding: 'utf8', stdio: 'pipe' })
     assert.equal(out.trim(), '', `${name} must print nothing for a malformed payload`)
+  }
+})
+
+/**
+ * A copy of the package with NO node_modules — a Claude Code plugin install is
+ * a bare git checkout, and `yaml` is unresolvable from it. Only the three
+ * things the plugin ships and a hook can reach are copied; nothing here can
+ * resolve a dependency, which is the whole point.
+ */
+function pluginCheckout() {
+  const dir = mkdtempSync(join(tmpdir(), 'docs-plugin-'))
+  for (const entry of ['hooks', 'scripts']) cpSync(join(PACKAGE_ROOT, entry), join(dir, entry), { recursive: true })
+  cpSync(join(PACKAGE_ROOT, 'package.json'), join(dir, 'package.json'))
+  return dir
+}
+
+/**
+ * A host repository with this package installed the way npm would leave it:
+ * `node_modules/@puralex/ai-doc-system` pointing at the real package root, so
+ * the engine the hook finds is the one the host's own gate runs. `junction` is
+ * the type Windows can create without elevation and POSIX ignores.
+ */
+function installedFixture(files, options) {
+  const root = gitFixture(files, options)
+  mkdirSync(join(root, 'node_modules', '@puralex'), { recursive: true })
+  symlinkSync(PACKAGE_ROOT, join(root, 'node_modules', '@puralex', 'ai-doc-system'), 'junction')
+  return root
+}
+
+test('a plugin checkout with no node_modules runs the host repository\'s installed engine', () => {
+  const plugin = pluginCheckout()
+  const root = installedFixture(
+    { 'docs/reference/x.md': '---\ntitle: X\nkind: reference\nstatus: reference\nupdated: 2026-08-17\n---\n# X\n' },
+    { withIndex: true },
+  )
+  try {
+    const raw = execFileSync(process.execPath, [join(plugin, 'hooks', 'reference-read.mjs')], {
+      cwd: root,
+      input: JSON.stringify({ tool_name: 'Read', tool_input: { file_path: join(root, 'docs/reference/x.md') }, cwd: root }),
+      encoding: 'utf8',
+      stdio: 'pipe',
+    })
+    const out = JSON.parse(raw)
+    assert.match(out.hookSpecificOutput.additionalContext, /not a commitment/i)
+
+    writeFileSync(join(root, 'docs/reference/y.md'), '# no frontmatter\n')
+    const edit = execFileSync(process.execPath, [join(plugin, 'hooks', 'docs-edit.mjs')], {
+      cwd: root,
+      input: JSON.stringify({ tool_name: 'Write', tool_input: { file_path: join(root, 'docs/reference/y.md') }, cwd: root }),
+      encoding: 'utf8',
+      stdio: 'pipe',
+    })
+    assert.match(JSON.parse(edit).hookSpecificOutput.additionalContext, /frontmatter/)
+  } finally {
+    rmSync(plugin, { recursive: true, force: true })
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('a plugin checkout in a repo with no install exits 0 and says nothing at all', () => {
+  const plugin = pluginCheckout()
+  const root = gitFixture(
+    { 'docs/reference/x.md': '---\ntitle: X\nkind: reference\nstatus: reference\nupdated: 2026-08-17\n---\n# X\n' },
+    { withIndex: true },
+  )
+  try {
+    for (const name of ['reference-read.mjs', 'docs-edit.mjs']) {
+      const result = spawnSync(process.execPath, [join(plugin, 'hooks', name)], {
+        cwd: root,
+        input: JSON.stringify({ tool_name: 'Read', tool_input: { file_path: join(root, 'docs/reference/x.md') }, cwd: root }),
+        encoding: 'utf8',
+        stdio: 'pipe',
+      })
+      assert.equal(result.status, 0, `${name} must exit 0 with no engine available`)
+      assert.equal(result.stdout, '', `${name} must print nothing with no engine available`)
+      assert.equal(result.stderr, '', `${name} must print no stack trace with no engine available`)
+    }
+  } finally {
+    rmSync(plugin, { recursive: true, force: true })
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('hooks.json wires both events to commands that exist in the package', () => {
+  const config = JSON.parse(readFileSync(join(PACKAGE_ROOT, 'hooks', 'hooks.json'), 'utf8'))
+  assert.deepEqual(Object.keys(config.hooks).sort(), ['PostToolUse', 'PreToolUse'])
+  assert.deepEqual(config.hooks.PreToolUse.map((entry) => entry.matcher), ['Read'])
+  assert.deepEqual(config.hooks.PostToolUse.map((entry) => entry.matcher), ['Write|Edit|MultiEdit'])
+  let commands = 0
+  for (const groups of Object.values(config.hooks)) {
+    for (const group of groups) {
+      for (const entry of group.hooks) {
+        assert.equal(entry.type, 'command')
+        const command = entry.command.replaceAll('${CLAUDE_PLUGIN_ROOT}', PACKAGE_ROOT)
+        const target = command.match(/"([^"]+)"/)?.[1]
+        assert.ok(target, `${entry.command} must quote the script path`)
+        assert.ok(existsSync(target), `${entry.command} names ${target}, which does not exist`)
+        commands += 1
+      }
+    }
+  }
+  assert.equal(commands, 2)
+})
+
+test('a corrupt evidence lock does not crash the edit hook', () => {
+  const root = gitFixture(
+    {
+      'docs/engineering/x.md': '---\ntitle: X\nkind: engineering\nstatus: active\nupdated: 2026-08-17\n---\n\n# X\n\nBody.\n',
+      'docs/evidence-lock.json': '<<<<<<< HEAD\n{}\n=======\n{}\n>>>>>>> theirs\n',
+    },
+    { withIndex: true },
+  )
+  try {
+    const result = spawnSync(process.execPath, [join(PACKAGE_ROOT, 'hooks', 'docs-edit.mjs')], {
+      cwd: root,
+      input: JSON.stringify({ tool_name: 'Edit', tool_input: { file_path: join(root, 'docs/engineering/x.md') }, cwd: root }),
+      encoding: 'utf8',
+      stdio: 'pipe',
+    })
+    assert.equal(result.status, 0)
+    assert.equal(result.stderr, '')
+    assert.match(JSON.parse(result.stdout).hookSpecificOutput.additionalContext, /is not valid JSON/)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
   }
 })

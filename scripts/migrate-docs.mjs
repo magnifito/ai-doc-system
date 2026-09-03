@@ -41,16 +41,12 @@ import { loadConfig } from './docs-config.mjs'
 import { kindForPath, moduleForPath, normalizeSegment, slugify, statusForKind } from './docs-taxonomy.mjs'
 import { lastCommitDate, listDocs, repoRoot } from './docs-fs.mjs'
 import { runDirect } from './docs-run.mjs'
+import { flagValues } from './docs-args.mjs'
 
 const DEFAULT_MAP = 'docs-migration.map.mjs'
 
-function flagValue(name) {
-  const index = process.argv.indexOf(name)
-  return index === -1 ? null : process.argv[index + 1]
-}
-
 async function loadMap(root) {
-  const given = flagValue('--map') ?? DEFAULT_MAP
+  const given = flagValues('migrate', process.argv, ['--map'])['--map'] ?? DEFAULT_MAP
   const file = isAbsolute(given) ? given : resolve(root, given)
   if (!existsSync(file)) {
     console.error(

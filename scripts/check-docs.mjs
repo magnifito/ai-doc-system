@@ -49,13 +49,14 @@ import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import { join, dirname, resolve, relative } from 'node:path'
 import { runDirect } from './docs-run.mjs'
+import { flagValues } from './docs-args.mjs'
 import { EVIDENCE_PATH, LIST_FIELDS, SCALAR_FIELDS, parseFrontmatter } from './docs-frontmatter.mjs'
 import { loadConfig } from './docs-config.mjs'
 import { isIsoDate, today } from './docs-dates.mjs'
 import { isExempt, kindForPath, moduleForPath, pathHygieneErrors, reservedStatuses, statusForKind } from './docs-taxonomy.mjs'
 import { changedPaths, existsCaseExact, listDocs, mergeBase, refExists, renamedFrom, repoRoot, showAtRef } from './docs-fs.mjs'
 import { renderIndex } from './gen-docs-index.mjs'
-import { hashEvidence, parsePathEvidence, readLock } from './verify-docs.mjs'
+import { LOCK_FILE, LOCK_UNREADABLE, hashEvidence, parsePathEvidence, readLock } from './verify-docs.mjs'
 
 /**
  * Evidence entries are the one field whose VALUE the gate inspects, because an
@@ -113,6 +114,12 @@ export function checkDocs(root, config = loadConfig(root), options = {}) {
   // Read once: every document's lock rows come out of the same file. A repo
   // that has never run `verify` has no lock, and no `evidence-lock` warnings.
   const lock = readLock(root, config)
+  // 8e. a lock file the tool cannot parse. Reported rather than thrown: the
+  // gate and both plugin hooks used to die on an unhandled SyntaxError from a
+  // generated file no author edits by hand. It rides on `evidence-lock`, so a
+  // project that has turned that rule off is not told about a file it does not
+  // use, and one that has raised it to `error` is stopped by it.
+  if (lock.error) add('evidence-lock', `${config.docsDir}/${LOCK_FILE}`, 'evidence-lock', LOCK_UNREADABLE)
   // The history-aware assertions resolve their ref ONCE, not once per document:
   // the merge base (what this branch forked from), the set of documents this
   // branch actually touched, and the renames git detected across that span.
@@ -331,7 +338,13 @@ export function checkDocs(root, config = loadConfig(root), options = {}) {
       const crossedTier = originPath !== path && kindForPath(config, originPath) !== kindForPath(config, path)
       const before = showAtRef(root, baseSha, originPath)
       if (data.promoted_from) {
-        if (before === null) {
+        // An origin the BRANCH created, renamed or deleted never existed at the
+        // base, and saying so would reject this tool's own output: `new` a
+        // reference document and `mv` it to product on one branch and the
+        // origin is born and gone inside the same diff. The origin being in the
+        // changed set is exactly that case; a `promoted_from` naming a document
+        // the branch never touched is still the typo this check exists for.
+        if (before === null && !changed.has(data.promoted_from)) {
           add('promoted-verbatim', path, 'promoted_from', `names ${data.promoted_from}, which did not exist at ${options.base}`)
         }
         // A promotion is a move. Both copies alive means the tree now claims the
@@ -475,7 +488,7 @@ function markdownLinks(body) {
 function docRefsIn(text, dir) {
   const plain = text
     .replace(/\b[a-z][a-z0-9+.-]*:\/\/\S+/gi, ' ')
-    .replace(/(^|[\s"'(\[<])\.\//g, '$1')
+    .replace(/(^|[\s"'([<])\.\//g, '$1')
   return plain.match(new RegExp(`(?<![\\w./-])${dir}/[A-Za-z0-9._\\-/]+\\.md`, 'g')) ?? []
 }
 
@@ -496,7 +509,10 @@ export function trackedDocRefs(root, config = loadConfig(root)) {
         `:(exclude)${dir}`,
         ...config.referenceScanExclude.map((path) => `:(exclude)${path}`),
       ],
-      { cwd: root, encoding: 'utf8' },
+      // stderr is captured, not inherited: outside a git repository (the test
+      // fixtures) git's `fatal: not a git repository` is an expected answer
+      // here, and letting it through would print into every test run.
+      { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
     )
     return new Set(docRefsIn(out, dir))
   } catch (error) {
@@ -527,24 +543,23 @@ const PRINT_CAP = 100
  * the escapes that follow it.
  * https://docs.github.com/actions/reference/workflow-commands-for-github-actions
  */
-function escapeData(value) {
+export function escapeData(value) {
   return `${value}`.replaceAll('%', '%25').replaceAll('\r', '%0D').replaceAll('\n', '%0A')
 }
 
 /** `escapeData` plus the two characters that delimit a property list. */
-function escapeProperty(value) {
+export function escapeProperty(value) {
   return escapeData(value).replaceAll(':', '%3A').replaceAll(',', '%2C')
-}
-
-/** The value after `name` on the command line, or null when it is absent. */
-function flagValue(name) {
-  const index = process.argv.indexOf(name)
-  return index === -1 ? null : process.argv[index + 1]
 }
 
 export function main() {
   const root = repoRoot()
-  const base = flagValue('--base')
+  // Both value flags are read BEFORE anything else runs, `--json` included: a
+  // command line the gate cannot parse has no output contract to honour yet,
+  // and a `--base` that silently vanished is a gate reporting green on rules it
+  // never ran.
+  const flags = flagValues('check', process.argv, ['--base', '--format'])
+  const base = flags['--base']
   // A base that does not resolve is refused rather than ignored. On a shallow
   // CI checkout `origin/main` is often not fetched, and quietly dropping the
   // git-aware rules would report a green gate that checked less than it says.
@@ -569,7 +584,7 @@ export function main() {
     process.exit(errors.length === 0 ? 0 : 1)
   }
 
-  const format = flagValue('--format') ?? 'text'
+  const format = flags['--format'] ?? 'text'
   if (format === 'github') {
     for (const violation of violations) {
       const level = violation.severity === 'error' ? 'error' : 'warning'

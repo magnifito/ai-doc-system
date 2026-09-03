@@ -11,12 +11,14 @@
  */
 import { strict as assert } from 'node:assert'
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import test from 'node:test'
 import { checkDocs } from './check-docs.mjs'
 import { writeIndex } from './gen-docs-index.mjs'
+import { mvDoc } from './mv-doc.mjs'
+import { newDoc } from './new-doc.mjs'
 
 /** A committed git repository containing exactly `files`. */
 function gitFixture(files) {
@@ -267,6 +269,54 @@ test('a same-tier rename is not a promotion and needs no rewrite', () => {
     execFileSync('git', ['mv', 'docs/product/x.md', 'docs/product/y.md'], { cwd: root, stdio: 'pipe' })
     regen(root)
     assert.deepEqual(promotionRules(checkDocs(root, undefined, { base: 'HEAD' })), [])
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+/** Replace everything after the frontmatter block, leaving the block untouched. */
+function rewriteBody(root, path, body) {
+  const text = readFileSync(join(root, path), 'utf8')
+  const end = text.indexOf('\n---\n', 4)
+  writeFileSync(join(root, path), `${text.slice(0, end + 5)}\n${body}\n`)
+}
+
+test('a document captured and promoted on the same branch is the tool\'s own output, not a defect', () => {
+  const captured = '# Y\n\nTheirs, at length: a competitor page copied into the reference tier so the\nteam can read it without pretending it is ours.\n'
+  const root = gitFixture({
+    'docs/reference/y.md': `---\ntitle: Y\nkind: reference\nstatus: reference\nupdated: 2026-08-17\n---\n${captured}`,
+  })
+  try {
+    const git = (...args) => execFileSync('git', args, { cwd: root, stdio: 'pipe' })
+    regen(root)
+    commitAll(root)
+    git('branch', '-M', 'main')
+    git('checkout', '-qb', 'feature')
+
+    // Born on this branch: `new` writes it, the branch commits it, `mv`
+    // promotes it. Its origin never existed at the merge base, and that is the
+    // tool's own output rather than a broken `promoted_from`.
+    newDoc(root, 'docs/reference/x.md', { title: 'X', summary: 'Captured today.' })
+    rewriteBody(root, 'docs/reference/x.md', '# X\n\nTheir words, captured this morning.')
+    regen(root)
+    commitAll(root)
+    mvDoc(root, 'docs/reference/x.md', 'docs/product/x.md')
+    rewriteBody(root, 'docs/product/x.md', '# X\n\nOur words, describing what we are building.')
+
+    // Promoted from a document that DID exist at the base, with the prose left
+    // verbatim: the check this fix must not disable.
+    mvDoc(root, 'docs/reference/y.md', 'docs/product/y.md')
+    regen(root)
+
+    const violations = checkDocs(root, undefined, { base: 'main' })
+    assert.deepEqual(
+      violations.filter((v) => v.file === 'docs/product/x.md' && (v.rule === 'promoted-verbatim' || v.rule === 'transition')),
+      [],
+    )
+    const verbatim = violations.filter((v) => v.rule === 'promoted-verbatim')
+    assert.equal(verbatim.length, 1)
+    assert.equal(verbatim[0].file, 'docs/product/y.md')
+    assert.match(verbatim[0].message, /body is identical/)
   } finally {
     rmSync(root, { recursive: true, force: true })
   }

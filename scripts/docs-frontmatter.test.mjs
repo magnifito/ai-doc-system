@@ -5,7 +5,7 @@
  */
 import { strict as assert } from 'node:assert'
 import test from 'node:test'
-import { parseFrontmatter, renderFrontmatter } from './docs-frontmatter.mjs'
+import { parseFrontmatter, patchScalar, renderFrontmatter } from './docs-frontmatter.mjs'
 
 test('reads a list field', () => {
   const source = [
@@ -103,4 +103,25 @@ test('an empty scalar is kept as an empty string, not dropped', () => {
   const { data } = parseFrontmatter('---\ntitle: X\nsummary:\n---\n')
   assert.equal(data.summary, '')
   assert.ok('summary' in data)
+})
+
+test('patchScalar replaces in place, inserts after the first anchor present, and falls back to the top', () => {
+  const raw = 'title: X\nkind: product\nstatus: draft\nupdated: 2026-08-01'
+  // Replace: every other byte survives, including the field order.
+  assert.equal(
+    patchScalar(raw, 'status', 'active', ['kind']),
+    'title: X\nkind: product\nstatus: active\nupdated: 2026-08-01',
+  )
+  // Insert: the FIRST anchor found wins, so anchors are passed in decreasing
+  // FIELD_ORDER proximity and the new line lands where the renderer would put it.
+  assert.equal(
+    patchScalar(raw, 'verified_on', '2026-09-03', ['review_by', 'updated', 'title']),
+    'title: X\nkind: product\nstatus: draft\nupdated: 2026-08-01\nverified_on: 2026-09-03',
+  )
+  // No anchor present: the top of the block, never dropped.
+  assert.equal(patchScalar('title: X', 'kind', 'product', ['module']), 'kind: product\ntitle: X')
+  // `^key:` is top level only: an indented key of the same name is not the one
+  // being patched, and a nested block must survive untouched.
+  const nested = 'title: X\nmeta:\n  status: nested\nstatus: draft'
+  assert.equal(patchScalar(nested, 'status', 'active', ['title']), 'title: X\nmeta:\n  status: nested\nstatus: active')
 })

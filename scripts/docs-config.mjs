@@ -121,8 +121,16 @@ export const DEFAULTS = {
    */
   tierStatus: { reference: 'reference', archive: 'superseded' },
 
-  /** Files exempt from frontmatter, relative to `docsDir`. */
-  exempt: ['INDEX.md', 'README.md'],
+  /**
+   * Files exempt from frontmatter, relative to `docsDir`. Every entry here is
+   * GENERATED: `gen` writes `INDEX.md`, and — once modules are configured —
+   * `ROADMAP.md` and a `README.md` per module tree. A generated artefact
+   * carrying frontmatter the generator did not write is a contradiction, so the
+   * gate must not demand it. `README.md` also covers the hand-written docs-root
+   * README, which is the tree's front door rather than a document in it.
+   * A single `*` stands for exactly one path segment (docs-taxonomy.mjs).
+   */
+  exempt: ['INDEX.md', 'README.md', 'ROADMAP.md', 'modules/*/README.md'],
 
   /**
    * NAMING. Path hygiene alone is a character rule — it rejects spaces and
@@ -171,6 +179,10 @@ export const DEFAULTS = {
    * not add a path here to silence a real dead pointer.
    */
   referenceScanExclude: [
+    // Installed dependencies are somebody else's repository. A vendored copy of
+    // THIS package names `docs/...` paths in its own templates and tests, and
+    // every one of them would be reported as a dead pointer in the host tree.
+    'node_modules',
     '.claude',
     '.agents',
     '_bmad',
@@ -239,7 +251,7 @@ export function loadConfig(root) {
     overrides = foldExtensions(parsed)
   }
   const merged = { ...DEFAULTS, ...overrides }
-  merged.rules = { ...RULES, ...(overrides.rules ?? {}) }
+  merged.rules = { ...RULES, ...overrides.rules }
   validate(overrides, merged)
   const config = withDerived(merged)
   cache.set(root, config)
@@ -259,7 +271,7 @@ export function withDerived(config) {
     moduleKeys: [...config.modules.map((entry) => entry.key), config.platformKey],
     exemptPaths: new Set(config.exempt.map((name) => `${config.docsDir}/${name}`)),
     // Callers that build a config from DEFAULTS directly still get the full map.
-    rules: { ...RULES, ...(config.rules ?? {}) },
+    rules: { ...RULES, ...config.rules },
   }
 }
 

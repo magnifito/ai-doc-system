@@ -390,3 +390,95 @@ test('running context-docs.mjs directly does not swallow the command word', () =
     rmSync(root, { recursive: true, force: true })
   }
 })
+
+test('a value flag given without a value is a usage error, not a silently skipped check', () => {
+  const root = committedGitFixture({ 'docs/engineering/quality-gate.md': GOOD })
+  try {
+    cli(['gen'], { cwd: root })
+    const cases = [
+      // Trailing, and followed by another flag: both used to read as "no value
+      // given", which skipped the history rules and reported a green gate.
+      [['check', '--base'], 'check: --base needs a value'],
+      [['check', '--base', '--json'], 'check: --base needs a value'],
+      [['check', '--format'], 'check: --format needs a value'],
+      [['check', '--format', '--all'], 'check: --format needs a value'],
+      [['verify', '--only'], 'verify: --only needs a value'],
+      [['verify', '--only', '--stamp'], 'verify: --only needs a value'],
+      [['impact', '--base'], 'impact: --base needs a value'],
+      [['new', '--title'], 'new: --title needs a value'],
+      [['new', 'docs/product/p.md', '--summary'], 'new: --summary needs a value'],
+      [['new', 'docs/product/p.md', '--status'], 'new: --status needs a value'],
+      [['mv', 'docs/product/p.md', 'docs/engineering/p.md', '--status'], 'mv: --status needs a value'],
+      [['migrate', '--map'], 'migrate: --map needs a value'],
+    ]
+    for (const [args, message] of cases) {
+      const { status, stdout, stderr } = cliResult(args, { cwd: root })
+      assert.equal(status, 2, `${args.join(' ')} must exit 2`)
+      assert.equal(stdout, '', `${args.join(' ')} must print nothing on stdout`)
+      assert.ok(stderr.includes(message), `${args.join(' ')} must say "${message}", got: ${stderr}`)
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('a corrupt evidence lock stops verify and only warns the gate', () => {
+  const conflicted = '<<<<<<< HEAD\n{\n  "entries": {}\n}\n=======\n{\n  "entries": {}\n}\n>>>>>>> theirs\n'
+  const root = gitFixture({
+    'docs/engineering/quality-gate.md': GOOD,
+    'docs/evidence-lock.json': conflicted,
+  })
+  try {
+    cli(['gen'], { cwd: root })
+    // `verify` refuses: rewriting a lock it could not read would silently drop
+    // every row in it, including rows for documents this run does not touch.
+    const verify = cliResult(['verify'], { cwd: root })
+    assert.equal(verify.status, 1)
+    assert.match(verify.stderr, /verify: docs\/evidence-lock\.json is not valid JSON — delete it and re-run `ai-doc-system verify`/)
+    assert.equal(readFileSync(join(root, 'docs/evidence-lock.json'), 'utf8'), conflicted)
+    // The gate reports it and, at the default severity, still passes.
+    const check = cliResult(['check'], { cwd: root })
+    assert.equal(check.status, 0)
+    assert.match(check.stderr, /docs\/evidence-lock\.json:evidence-lock — is not valid JSON .* \[evidence-lock, warn\]/)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('mv drives the promotion through the CLI, with the same argv the scripts see directly', () => {
+  const root = committedGitFixture({
+    'docs/reference/vendor-notes.md':
+      '---\ntitle: Vendor notes\nkind: reference\nstatus: reference\nupdated: 2026-08-27\n---\n\n# Vendor notes\n\nTheirs.\n',
+  })
+  try {
+    cli(['gen'], { cwd: root })
+    const out = cli(['mv', 'docs/reference/vendor-notes.md', 'docs/product/vendor-notes.md'], { cwd: root })
+    assert.match(out, /moved docs\/reference\/vendor-notes\.md -> docs\/product\/vendor-notes\.md/)
+    assert.match(out, /Now rewrite the prose/)
+    const moved = readFileSync(join(root, 'docs/product/vendor-notes.md'), 'utf8')
+    assert.match(moved, /^kind: product$/m)
+    assert.match(moved, /^status: draft$/m)
+    assert.match(moved, /^promoted_from: docs\/reference\/vendor-notes\.md$/m)
+    // `mv` leaves the tree gate-clean: it regenerates the index itself.
+    assert.match(cli(['check'], { cwd: root }), /check-docs: OK/)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('check --format github escapes a comma in the annotated file name', () => {
+  const root = gitFixture({
+    // A comma is legal in a filename everywhere this runs, and it is a property
+    // delimiter in a workflow command: unescaped it forges a second property.
+    'docs/engineering/a,b.md':
+      '---\ntitle: A\nkind: engineering\nstatus: active\nupdated: 2026-08-27\n---\n\n# A\n',
+  })
+  try {
+    cli(['gen'], { cwd: root })
+    const { status, stdout } = cliResult(['check', '--format', 'github'], { cwd: root })
+    assert.equal(status, 1)
+    assert.match(stdout, /^::error file=docs\/engineering\/a%2Cb\.md,title=path::/m)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
