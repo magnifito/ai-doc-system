@@ -57,6 +57,16 @@ export const DEFAULTS = {
   rules: {},
 
   /**
+   * Command names an `evidence:` entry may start with. Anything else has to be
+   * a repository path that exists, so free prose stays rejected. A project that
+   * drives its checks through some other runner adds it with `evidenceRunners+`.
+   */
+  evidenceRunners: [
+    'bun', 'bunx', 'node', 'npm', 'npx', 'pnpm', 'yarn', 'deno', 'make', 'just',
+    'cargo', 'go', 'pytest', 'python', 'python3', 'grep', 'rg', 'ls', 'git', 'curl', 'psql',
+  ],
+
+  /**
    * Ordered `[prefix, kind]` pairs, prefixes relative to `docsDir`. FIRST MATCH
    * WINS, so nested tiers must precede the tier that contains them.
    */
@@ -171,6 +181,32 @@ export const DEFAULTS = {
 
 const cache = new Map()
 
+/**
+ * Resolve `"<key>+": [...]` into `"<key>"`, appending to the DEFAULT rather than
+ * replacing it. Replacing is the right default for a closed set a project owns,
+ * but the array settings that grow (`referenceScanExclude`, `sentinels`,
+ * `evidenceRunners`) are ones where a project wants ITS entries as well as the
+ * shipped ones, and a hand-copied default silently falls behind an upgrade.
+ *
+ * Runs before the merge, so `validate` only ever sees plain keys.
+ */
+function foldExtensions(overrides) {
+  const out = {}
+  for (const [key, value] of Object.entries(overrides)) {
+    if (!key.endsWith('+')) {
+      out[key] = value
+      continue
+    }
+    const base = key.slice(0, -1)
+    if (!Array.isArray(DEFAULTS[base])) {
+      throw new Error(`${CONFIG_FILE}: "${key}" extends "${base}", which is not an array setting`)
+    }
+    if (!Array.isArray(value)) throw new Error(`${CONFIG_FILE}: "${key}" must be an array`)
+    out[base] = [...(out[base] ?? DEFAULTS[base]), ...value]
+  }
+  return out
+}
+
 /** Resolved configuration for one repository root. Cached per root. */
 export function loadConfig(root) {
   if (cache.has(root)) return cache.get(root)
@@ -178,7 +214,7 @@ export function loadConfig(root) {
   let overrides = {}
   if (existsSync(file)) {
     try {
-      overrides = JSON.parse(readFileSync(file, 'utf8'))
+      overrides = foldExtensions(JSON.parse(readFileSync(file, 'utf8')))
     } catch (error) {
       throw new Error(`${CONFIG_FILE} is not valid JSON: ${error.message}`, { cause: error })
     }
@@ -221,6 +257,8 @@ export function clearConfigCache() {
  */
 function validate(overrides, merged) {
   for (const key of Object.keys(overrides)) {
+    // Editors resolve completion from `$schema`; the loader has no use for it.
+    if (key === '$schema') continue
     if (!(key in DEFAULTS)) {
       throw new Error(`${CONFIG_FILE}: unknown key "${key}" — known keys are ${Object.keys(DEFAULTS).join(', ')}`)
     }

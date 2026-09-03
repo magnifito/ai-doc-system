@@ -6,7 +6,7 @@
  * Run: node --test scripts/docs-config.test.mjs
  */
 import { strict as assert } from 'node:assert'
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import test from 'node:test'
@@ -221,4 +221,50 @@ test('rules: an unknown id or severity is rejected', () => {
   clearConfigCache()
   assert.throws(() => loadConfig(root), /severity "loud"/)
   rmSync(root, { recursive: true, force: true })
+})
+
+
+test('a "+" key extends the default array instead of replacing it', () => {
+  withFixture({}, { 'referenceScanExclude+': ['site'], 'sentinels+': ['SPEC'] }, (root) => {
+    clearConfigCache()
+    const config = loadConfig(root)
+    assert.ok(config.referenceScanExclude.includes('.claude'))
+    assert.ok(config.referenceScanExclude.includes('site'))
+    assert.ok(config.sentinels.includes('README') && config.sentinels.includes('SPEC'))
+    assert.equal('referenceScanExclude+' in config, false)
+  })
+})
+
+test('a "+" key on a non-array default is rejected', () => {
+  withFixture({}, { 'docsDir+': ['x'] }, (root) => {
+    clearConfigCache()
+    // Both halves matter: the message names the offending key AND says why, so
+    // the unknown-key path cannot satisfy this test by accident.
+    assert.throws(() => loadConfig(root), /"docsDir\+"/)
+    assert.throws(() => loadConfig(root), /not an array setting/)
+  })
+})
+
+test('evidenceRunners has defaults and can be extended', () => {
+  withFixture({}, { 'evidenceRunners+': ['just'] }, (root) => {
+    clearConfigCache()
+    const config = loadConfig(root)
+    assert.ok(config.evidenceRunners.includes('pnpm') && config.evidenceRunners.includes('just'))
+  })
+})
+
+test('a "$schema" key is allowed and ignored', () => {
+  withFixture({}, { $schema: './schema/docs-system.config.schema.json' }, (root) => {
+    clearConfigCache()
+    const config = loadConfig(root)
+    assert.equal(config.docsDir, DEFAULTS.docsDir)
+  })
+})
+
+test('the JSON schema names every DEFAULTS key and its "+" form for arrays', () => {
+  const schema = JSON.parse(readFileSync(new URL('../schema/docs-system.config.schema.json', import.meta.url), 'utf8'))
+  for (const [key, value] of Object.entries(DEFAULTS)) {
+    assert.ok(key in schema.properties, `schema lacks ${key}`)
+    if (Array.isArray(value)) assert.ok(`${key}+` in schema.properties, `schema lacks ${key}+`)
+  }
 })

@@ -577,3 +577,20 @@ test('2h. implements, superseded_by and evidence resolve case-exactly', () => {
   // A directory entry is legitimate evidence: the trailing slash is stripped, not rejected.
   assert.deepEqual(violations.filter((v) => v.file === 'docs/product/d.md' && v.field === 'evidence'), [])
 })
+
+test('8l. evidence may start with a configured runner', () => {
+  // `bazel` is deliberately NOT in the shipped runner list: the first half has
+  // to fail on the defaults for the second half to prove anything.
+  const state = doc({ title: 'S', kind: 'state', status: 'active', updated: '2026-08-17', module: 'crm', verified_on: '2026-08-17', evidence: ['bazel test //crm:all'] })
+  const files = { 'docs/modules/crm/state/s.md': state }
+  const base = { modules: [{ key: 'crm', class: 'anchor' }], tiers: [['modules/*/state/', 'state'], ...DEFAULTS.tiers], requiredFields: { state: ['verified_on', 'evidence'] } }
+  assert.ok(run(files, { config: base }).some((v) => v.rule === 'evidence'))
+  assert.ok(!run(files, { config: { ...base, evidenceRunners: [...DEFAULTS.evidenceRunners, 'bazel'] } }).some((v) => v.rule === 'evidence'))
+})
+
+test('12a. shipped without code is a warning, not an error', () => {
+  const violations = run({ 'docs/plans/done/x.md': doc({ title: 'X', kind: 'plan', status: 'shipped', updated: '2026-08-17' }) })
+  const hit = violations.find((v) => v.rule === 'shipped-code')
+  assert.ok(hit)
+  assert.equal(hit.severity, 'warn')
+})

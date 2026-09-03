@@ -49,14 +49,13 @@ import { renderIndex } from './gen-docs-index.mjs'
 // tree — `app/api/booking/[calendarSlug]/route.ts`, `app/[locale]/(public)/…` —
 // so a validator that rejects them rejects real evidence.
 const EVIDENCE_PATH = /^([A-Za-z0-9._\-/[\]()@]+)(?::\d+(?:-\d+)?)?$/
-const EVIDENCE_RUNNERS = ['bun', 'bunx', 'node', 'npm', 'npx', 'grep', 'ls', 'git', 'curl', 'psql']
 
-function evidenceError(entry, exists) {
+function evidenceError(entry, exists, runners) {
   const first = entry.trim().split(/\s+/)[0]
-  if (EVIDENCE_RUNNERS.includes(first)) return null
+  if (runners.includes(first)) return null
   const match = entry.trim().match(EVIDENCE_PATH)
   if (!match) {
-    return `"${entry}" is not a path or a command — start it with ${EVIDENCE_RUNNERS.join('/')} or name a file`
+    return `"${entry}" is not a path or a command — start it with ${runners.join('/')} or name a file`
   }
   // A trailing slash is legitimate for directory evidence; `exists` checks
   // every segment against its parent listing, so it is stripped first.
@@ -178,7 +177,7 @@ export function checkDocs(root, config = loadConfig(root), options = {}) {
     // 8b. evidence entries are paths that exist, or commands.
     if (Array.isArray(data.evidence)) {
       for (const entry of data.evidence) {
-        const message = evidenceError(entry, exists)
+        const message = evidenceError(entry, exists, config.evidenceRunners)
         if (message) add('evidence', path, 'evidence', message)
       }
     }
@@ -204,6 +203,11 @@ export function checkDocs(root, config = loadConfig(root), options = {}) {
         add('superseded', path, 'superseded_by', `points at "${data.superseded_by}", which does not exist`)
       }
     }
+
+    // shipped-code: the convention is that a shipped document points at its
+    // implementation. A warning, not an error — a blocking rule invites
+    // placeholder paths (design section 4.3).
+    if (data.status === 'shipped' && !data.code) add('shipped-code', path, 'code', 'status is `shipped` but no `code:` names the implementation')
 
     // 5a. dead links inside the doc body — relative, or root-relative `<docsDir>/...`
     for (const target of markdownLinks(body)) {
