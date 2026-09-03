@@ -31,6 +31,7 @@
   "files": [
     "cli",
     "scripts",
+    "hooks",
     "schema",
     "templates",
     "docs",
