@@ -6,7 +6,7 @@
  * Run: node --test scripts/cli.test.mjs
  */
 import { strict as assert } from 'node:assert'
-import { execFileSync } from 'node:child_process'
+import { execFileSync, spawnSync } from 'node:child_process'
 import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -18,6 +18,15 @@ const BIN = join(PACKAGE_ROOT, 'cli', 'cli.mjs')
 
 function cli(args, options = {}) {
   return execFileSync(process.execPath, [BIN, ...args], { encoding: 'utf8', stdio: 'pipe', ...options })
+}
+
+/**
+ * `cli` returns stdout only, which is all a passing command has to say. A run
+ * that exits 0 while WRITING TO STDERR — the warn-only path of the gate — needs
+ * both streams and the status, so it spawns rather than throwing on failure.
+ */
+function cliResult(args, options = {}) {
+  return spawnSync(process.execPath, [BIN, ...args], { encoding: 'utf8', stdio: 'pipe', ...options })
 }
 
 /** A git repository containing exactly `files` (no commit needed). */
@@ -67,6 +76,23 @@ test('advisory writes to GITHUB_STEP_SUMMARY when the variable is set', () => {
     const summary = join(root, 'summary.md')
     cli(['advisory'], { cwd: root, env: { ...process.env, GITHUB_STEP_SUMMARY: summary } })
     assert.match(readFileSync(summary, 'utf8'), /dead `code:` pointer/)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('a rule configured `warn` prints to stderr and still exits 0', () => {
+  const root = gitFixture({
+    'docs-system.config.json': JSON.stringify({ rules: { implements: 'warn' } }),
+    'docs/engineering/b.md':
+      '---\ntitle: B\nkind: engineering\nstatus: active\nupdated: 2026-08-27\nimplements: docs/nowhere.md\n---\n\n# B\n',
+  })
+  try {
+    cli(['gen'], { cwd: root })
+    const { status, stdout, stderr } = cliResult(['check'], { cwd: root })
+    assert.equal(status, 0)
+    assert.match(stderr, /docs\/engineering\/b\.md:implements .* \[implements, warn\]/)
+    assert.match(stdout, /check-docs: OK \(1 warning\(s\)\)/)
   } finally {
     rmSync(root, { recursive: true, force: true })
   }

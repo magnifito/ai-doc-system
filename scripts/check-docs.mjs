@@ -251,7 +251,7 @@ export function checkDocs(root, config = loadConfig(root), options = {}) {
 export function applySeverity(config, violations) {
   const out = []
   for (const violation of violations) {
-    const severity = config.rules[violation.rule] ?? 'error'
+    const severity = config.rules?.[violation.rule] ?? 'error'
     if (severity === 'off') continue
     out.push({ ...violation, severity })
   }
