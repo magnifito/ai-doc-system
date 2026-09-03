@@ -35,7 +35,7 @@
     "schema",
     "templates",
     "docs",
-    "SKILL.md"
+    "skills"
   ],
   "scripts": {
     "test": "node --test",
