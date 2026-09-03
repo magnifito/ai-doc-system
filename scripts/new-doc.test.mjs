@@ -67,3 +67,17 @@ test('new refuses a path that fails hygiene', () => {
     rmSync(root, { recursive: true, force: true })
   }
 })
+
+test('an empty --title falls back to the file name rather than writing no title', () => {
+  const root = gitFixture({})
+  try {
+    const { frontmatter } = newDoc(root, 'docs/product/invoices.md', {
+      title: '',
+      now: new Date('2026-09-03T12:00:00Z'),
+    })
+    assert.match(frontmatter, /^title: invoices$/m)
+    assert.equal(checkDocs(root).filter((v) => v.severity === 'error').length, 0)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})

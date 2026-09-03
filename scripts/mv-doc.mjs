@@ -34,11 +34,15 @@ export function mvDoc(root, from, to, { status, now } = {}, config = loadConfig(
   const kind = kindForPath(config, to)
   if (kind === null) throw new Error(`${to} is under no tier`)
   const moduleKey = config.modules.length > 0 ? moduleForPath(config, to) : null
+  // Without this the old `module:` line would survive the move and the gate would
+  // fail on a document this command itself wrote.
+  if (config.modules.length > 0 && moduleKey === null) throw new Error(`${to} is in no module tree`)
   const { data, raw, body, present } = parseFrontmatter(readFileSync(join(root, from), 'utf8'))
   if (!present) throw new Error(`${from} has no frontmatter — add it first`)
   const fromKind = kindForPath(config, from)
   const forced = statusForKind(config, kind)
   const nextStatus = forced ?? status ?? (fromKind === 'reference' ? 'draft' : data.status)
+  if (!nextStatus) throw new Error(`${from} has no status — pass --status`)
   if (!config.statuses.includes(nextStatus)) {
     throw new Error(`"${nextStatus}" is not one of ${config.statuses.join(' | ')}`)
   }
@@ -49,7 +53,12 @@ export function mvDoc(root, from, to, { status, now } = {}, config = loadConfig(
   } catch (error) {
     // A document that git does not track yet is still a document; only that
     // failure falls back to a plain rename, so a real git error still surfaces.
-    if (!`${error.stderr ?? ''}`.includes('not under version control')) throw error
+    const stderr = `${error.stderr ?? ''}`
+    // git's own first line says what went wrong; everything after it is noise
+    // in a one-line CLI error.
+    if (!stderr.includes('not under version control')) {
+      throw new Error(`git mv: ${stderr.trim().split('\n')[0] || error.message}`)
+    }
     renameSync(join(root, from), join(root, to))
   }
   let patched = patchScalar(raw, 'kind', kind, ['summary', 'title'])

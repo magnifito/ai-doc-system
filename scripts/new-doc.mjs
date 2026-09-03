@@ -5,7 +5,7 @@
  * today's `updated`, then regenerate the index. Most gate failures come from
  * hand-written frontmatter; this removes the hand.
  *
- * Usage: node scripts/new-doc.mjs <docs/tier/name.md> [--title "..."] [--summary "..."] [--status draft]
+ * Usage: node scripts/new-doc.mjs docs/<tier>/<name>.md [--title "..."] [--summary "..."] [--status draft]
  */
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -42,7 +42,8 @@ export function newDoc(root, path, { title, summary, status, now } = {}, config 
   }
   const name = path.split('/').pop().replace(/\.md$/, '')
   const meta = {
-    title: title ?? name,
+    // `||`, not `??`: `--title ""` is a mistake, and an empty title fails the gate.
+    title: title || name,
     ...(summary ? { summary } : {}),
     kind,
     ...(moduleKey ? { module: moduleKey } : {}),
@@ -79,7 +80,7 @@ function docPaths() {
 export function main() {
   const [path] = docPaths()
   if (!path) {
-    console.error('usage: ai-doc-system new <docs/tier/name.md> [--title "..."] [--summary "..."] [--status <status>]')
+    console.error('usage: ai-doc-system new docs/<tier>/<name>.md [--title "..."] [--summary "..."] [--status <status>]')
     process.exit(2)
   }
   try {
