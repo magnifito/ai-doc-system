@@ -568,7 +568,12 @@ test('2h. implements, superseded_by and evidence resolve case-exactly', () => {
     'docs/product/target.md': doc({ title: 'T', kind: 'product', status: 'active', updated: '2026-08-17' }),
     'docs/product/a.md': doc({ title: 'A', kind: 'product', status: 'active', updated: '2026-08-17', implements: 'docs/product/TARGET.md' }),
     'docs/archive/b.md': doc({ title: 'B', kind: 'archive', status: 'superseded', updated: '2026-08-17', superseded_by: 'docs/product/Target.md' }),
+    'docs/product/c.md': doc({ title: 'C', kind: 'product', status: 'active', updated: '2026-08-17', evidence: ['docs/product/TARGET.md'] }),
+    'docs/product/d.md': doc({ title: 'D', kind: 'product', status: 'active', updated: '2026-08-17', evidence: ['docs/product/'] }),
   })
   assert.ok(violations.some((v) => v.field === 'implements'))
   assert.ok(violations.some((v) => v.field === 'superseded_by'))
+  assert.ok(violations.some((v) => v.file === 'docs/product/c.md' && v.field === 'evidence'))
+  // A directory entry is legitimate evidence: the trailing slash is stripped, not rejected.
+  assert.deepEqual(violations.filter((v) => v.file === 'docs/product/d.md' && v.field === 'evidence'), [])
 })

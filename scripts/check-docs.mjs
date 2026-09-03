@@ -51,7 +51,7 @@ import { renderIndex } from './gen-docs-index.mjs'
 const EVIDENCE_PATH = /^([A-Za-z0-9._\-/[\]()@]+)(?::\d+(?:-\d+)?)?$/
 const EVIDENCE_RUNNERS = ['bun', 'bunx', 'node', 'npm', 'npx', 'grep', 'ls', 'git', 'curl', 'psql']
 
-function evidenceError(root, entry, exists) {
+function evidenceError(entry, exists) {
   const first = entry.trim().split(/\s+/)[0]
   if (EVIDENCE_RUNNERS.includes(first)) return null
   const match = entry.trim().match(EVIDENCE_PATH)
@@ -178,7 +178,7 @@ export function checkDocs(root, config = loadConfig(root), options = {}) {
     // 8b. evidence entries are paths that exist, or commands.
     if (Array.isArray(data.evidence)) {
       for (const entry of data.evidence) {
-        const message = evidenceError(root, entry, exists)
+        const message = evidenceError(entry, exists)
         if (message) add('evidence', path, 'evidence', message)
       }
     }
@@ -314,15 +314,32 @@ function markdownLinks(body) {
 }
 
 /**
+ * The root-relative `<docsDir>/....md` references in one blob of text, in the
+ * order they appear. Two normalisations run first, and both branches of the
+ * scan share them:
+ *
+ *   - URLs are removed. `github.com/owner/repo/blob/main/<docsDir>/x.md` names
+ *     a path in SOME repository on the web, not one in this checkout.
+ *   - a leading `./` is dropped, because `[x](./<docsDir>/x.md)` in a root
+ *     README is an ordinary reference to this tree.
+ *
+ * What the lookbehind then excludes is everything that cannot be root-relative
+ * here: `../<docsDir>/x.md`, `/<docsDir>/x.md`, `vendor/<docsDir>/x.md`.
+ */
+function docRefsIn(text, dir) {
+  const plain = text
+    .replace(/\b[a-z][a-z0-9+.-]*:\/\/\S+/gi, ' ')
+    .replace(/(^|[\s"'(\[<])\.\//g, '$1')
+  return plain.match(new RegExp(`(?<![\\w./-])${dir}/[A-Za-z0-9._\\-/]+\\.md`, 'g')) ?? []
+}
+
+/**
  * Every `<docsDir>/....md` string in tracked files outside the docs tree. Uses
  * `git grep`; in a non-git tree (the test fixtures) it falls back to scanning
  * AGENTS.md and CLAUDE.md, the two highest-value pointer files.
  */
 export function trackedDocRefs(root, config = loadConfig(root)) {
   const dir = config.docsDir
-  // The lookbehind is what keeps a URL from reading as a repository path:
-  // `.../blob/main/docs/x.md` is preceded by `/`, a local mention never is.
-  const pattern = new RegExp(`(?<![\\w./-])${dir}/[A-Za-z0-9._\\-/]+\\.md`, 'g')
   try {
     const out = execFileSync(
       'git',
@@ -335,7 +352,7 @@ export function trackedDocRefs(root, config = loadConfig(root)) {
       ],
       { cwd: root, encoding: 'utf8' },
     )
-    return new Set(out.match(pattern) ?? [])
+    return new Set(docRefsIn(out, dir))
   } catch (error) {
     if (error.status === 1) return new Set() // git grep: no matches
     // Outside a git repo (the test fixtures) fall back silently; any OTHER git
@@ -347,7 +364,7 @@ export function trackedDocRefs(root, config = loadConfig(root)) {
     for (const name of ['AGENTS.md', 'CLAUDE.md']) {
       const file = join(root, name)
       if (!existsSync(file)) continue
-      for (const ref of readFileSync(file, 'utf8').match(pattern) ?? []) refs.add(ref)
+      for (const ref of docRefsIn(readFileSync(file, 'utf8'), dir)) refs.add(ref)
     }
     return refs
   }

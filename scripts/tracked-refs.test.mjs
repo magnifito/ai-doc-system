@@ -123,3 +123,20 @@ test('a docs path inside a URL is not a reference to this repository', () => {
     },
   )
 })
+
+test('a leading ./ is a reference to this tree; ../ and URLs are not', () => {
+  withGitFixture(
+    {
+      'README.md': [
+        '[here](./docs/engineering/local.md)',
+        '[up](../docs/engineering/design.md)',
+        '[web](https://github.com/magnifito/ai-doc-system/blob/main/docs/engineering/design.md)',
+        '',
+      ].join('\n'),
+      'docs/engineering/local.md': DOC,
+    },
+    (root) => {
+      assert.deepEqual([...trackedDocRefs(root)], ['docs/engineering/local.md'])
+    },
+  )
+})
