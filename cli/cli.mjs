@@ -14,6 +14,7 @@ const COMMANDS = {
   mv: ['mv-doc.mjs', 'git mv + restamp + regenerate (promotion)'],
   check: ['check-docs.mjs', 'run the blocking gate'],
   advisory: ['check-docs-advisory.mjs', 'non-blocking drift report'],
+  impact: ['impact-docs.mjs', 'documents whose claims cover the changed paths'],
   gen: ['gen-docs-index.mjs', 'regenerate INDEX.md and index.json'],
   fix: ['fix-docs-frontmatter.mjs', 'restamp kind/module after moves'],
   migrate: ['migrate-docs.mjs', 'one-shot migration (needs a map)'],

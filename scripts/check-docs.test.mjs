@@ -671,3 +671,18 @@ test('13h. a list field that is not a list is a violation', () => {
   )
   assert.ok(violations.some((v) => v.rule === 'evidence' && v.field === 'evidence' && /must be a list/.test(v.message)))
 })
+
+test('14a. index.json carries a by_code reverse map over code: and evidence paths', () => {
+  const root = fixture({
+    'src/a.ts': 'x',
+    'src/b/index.ts': 'x',
+    'docs/product/a.md': doc({ title: 'A', kind: 'product', status: 'shipped', updated: '2026-08-17', code: 'src/a.ts' }),
+    'docs/product/b.md': doc({ title: 'B', kind: 'product', status: 'shipped', updated: '2026-08-17', code: 'src/b/' }),
+  })
+  try {
+    const json = JSON.parse(readFileSync(join(root, 'docs/index.json'), 'utf8'))
+    assert.deepEqual(json.by_code, { 'src/a.ts': ['docs/product/a.md'], 'src/b': ['docs/product/b.md'] })
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})

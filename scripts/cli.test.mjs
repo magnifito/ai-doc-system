@@ -40,6 +40,17 @@ function gitFixture(files) {
   return root
 }
 
+/** The same, with everything committed, for commands that read git history. */
+function committedGitFixture(files) {
+  const root = gitFixture(files)
+  const git = (...args) => execFileSync('git', args, { cwd: root, stdio: 'pipe' })
+  git('config', 'user.email', 'test@example.test')
+  git('config', 'user.name', 'Test')
+  git('add', '-A')
+  git('commit', '-qm', 'fixture')
+  return root
+}
+
 const GOOD = '---\ntitle: Quality gate\nkind: engineering\nstatus: active\nupdated: 2026-08-27\n---\n\n# Quality gate\n'
 
 test('--version prints the package version', () => {
@@ -212,6 +223,22 @@ test('check --format github escapes workflow-command metacharacters', () => {
     assert.ok(lines.length > 0)
     for (const line of lines) assert.match(line, /^::(error|warning) /)
     assert.match(stdout, /::error file=docs\/engineering\/c\.md,title=implements::implements — points at "docs\/a%0Ab\.md"/)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('impact names the documents claiming the code that changed', () => {
+  const root = committedGitFixture({
+    'src/a.ts': 'x',
+    'docs/product/a.md':
+      '---\ntitle: A\nkind: product\nstatus: shipped\nupdated: 2026-08-27\ncode: src/a.ts\n---\n\n# A\n',
+  })
+  try {
+    writeFileSync(join(root, 'src/a.ts'), 'changed')
+    const out = cli(['impact'], { cwd: root })
+    assert.match(out, /docs\/product\/a\.md claims src\/a\.ts/)
+    assert.match(out, /src\/a\.ts changed/)
   } finally {
     rmSync(root, { recursive: true, force: true })
   }

@@ -45,6 +45,10 @@ export function buildIndex(root, config = loadConfig(root)) {
       updated: str(data, 'updated') ?? '',
       ...(str(data, 'review_by') ? { review_by: data.review_by } : {}),
       ...(str(data, 'verified_on') ? { verified_on: data.verified_on } : {}),
+      // Carried so the reverse index can point back from a path an evidence
+      // entry names. Only ever a list here; a malformed value is the gate's
+      // business, and the index must not carry a shape the renderers cannot.
+      ...(Array.isArray(data.evidence) && data.evidence.length > 0 ? { evidence: data.evidence } : {}),
       ...(str(data, 'commitment') ? { commitment: data.commitment } : {}),
       ...(Array.isArray(data.changes) && data.changes.length > 0 ? { changes: data.changes } : {}),
       ...(str(data, 'implements') ? { implements: data.implements } : {}),
@@ -58,8 +62,51 @@ export function buildIndex(root, config = loadConfig(root)) {
   return entries
 }
 
-export function renderJson(entries) {
-  return `${JSON.stringify({ generated: 'scripts/gen-docs-index.mjs', count: entries.length, docs: entries }, null, 2)}\n`
+/**
+ * Normalise a `code:` value or a path-form evidence entry to a repository path:
+ * no `#fragment`, no `:line` or `:line-line` suffix, no trailing slash — so a
+ * document claiming `src/api/` and one claiming `src/api` land on one key.
+ */
+function codeKey(value) {
+  return value.split('#')[0].replace(/:\d+(?:-\d+)?$/, '').replace(/\/$/, '')
+}
+
+/**
+ * The reverse of `code:`: a code path -> the documents that claim it. Keys are
+ * sorted by codepoint and each list is sorted, because this ships inside
+ * `index.json`, which has to regenerate byte-identically.
+ */
+export function buildByCode(entries, config = withDerived(DEFAULTS)) {
+  const map = new Map()
+  const put = (key, path) => {
+    if (!map.has(key)) map.set(key, new Set())
+    map.get(key).add(path)
+  }
+  for (const entry of entries) {
+    if (entry.code) put(codeKey(entry.code), entry.path)
+    for (const item of entry.evidence ?? []) {
+      // A malformed list member is the gate's violation to report, not a crash
+      // to raise here: the gate regenerates this index before it can report it.
+      if (typeof item !== 'string') continue
+      // Command-form evidence (`npm test`) names no path to point back from.
+      const first = item.trim().split(/\s+/)[0]
+      if (config.evidenceRunners.includes(first)) continue
+      put(codeKey(item.trim()), entry.path)
+    }
+  }
+  return Object.fromEntries(
+    [...map].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)).map(([key, docs]) => [key, [...docs].sort()]),
+  )
+}
+
+export function renderJson(entries, config) {
+  const payload = {
+    generated: 'scripts/gen-docs-index.mjs',
+    count: entries.length,
+    docs: entries,
+    by_code: buildByCode(entries, config),
+  }
+  return `${JSON.stringify(payload, null, 2)}\n`
 }
 
 /**
@@ -211,7 +258,7 @@ export function renderRoadmap(config, entries) {
 export function renderIndex(root, config = loadConfig(root)) {
   const entries = buildIndex(root, config)
   const targets = [
-    [`${config.docsDir}/index.json`, renderJson(entries)],
+    [`${config.docsDir}/index.json`, renderJson(entries, config)],
     [`${config.docsDir}/INDEX.md`, renderMarkdown(entries, config)],
   ]
   for (const moduleDef of config.modules) {

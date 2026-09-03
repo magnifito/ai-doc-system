@@ -84,3 +84,42 @@ export function lastCommitDate(root, path) {
     return ''
   }
 }
+
+/**
+ * Repo-relative paths that changed.
+ *
+ * With `base`, everything that differs from the point the branch left `base` —
+ * the merge base, so commits landed on `base` since the fork are not reported
+ * as this branch's work — down to the working tree, so a local run sees edits
+ * that are not committed yet. Without `base`, the working tree plus the index,
+ * untracked files included; a repository with no commits at all falls back to
+ * the index alone, because there is no `HEAD` to diff against.
+ *
+ * `core.quotePath=false` for the same reason as `lastCommitDates`: the default
+ * C-quotes a non-ASCII path, which would then match no claim.
+ */
+export function changedPaths(root, base) {
+  const git = (args) =>
+    execFileSync('git', ['-c', 'core.quotePath=false', ...args], {
+      cwd: root,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    })
+      .split('\n')
+      .filter(Boolean)
+  const untracked = () => git(['ls-files', '--others', '--exclude-standard'])
+  if (base) {
+    let from = base
+    try {
+      from = git(['merge-base', base, 'HEAD'])[0] ?? base
+    } catch {
+      /* unrelated histories, or no HEAD: compare against the ref itself */
+    }
+    return git(['diff', '--name-only', from])
+  }
+  try {
+    return [...new Set([...git(['diff', '--name-only', 'HEAD']), ...untracked()])]
+  } catch {
+    return [...new Set([...git(['diff', '--name-only', '--cached']), ...untracked()])]
+  }
+}
