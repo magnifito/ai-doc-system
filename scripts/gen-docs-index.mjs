@@ -26,7 +26,9 @@ export function buildIndex(root, config = loadConfig(root)) {
     entries.push({
       path,
       title: data.title ?? '',
-      ...(data.summary ? { summary: data.summary } : {}),
+      // Only a string: a list- or map-valued summary is a defect the gate
+      // reports, and carrying it here would crash the table renderer instead.
+      ...(typeof data.summary === 'string' && data.summary ? { summary: data.summary } : {}),
       kind: kindForPath(config, path) ?? '',
       // Omitted rather than empty when the project declares no modules, so a
       // tree that does not use the axis keeps a byte-identical index.

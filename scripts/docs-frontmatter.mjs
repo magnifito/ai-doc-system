@@ -18,7 +18,7 @@ import { parse } from 'yaml'
 const FENCE = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/
 
 /**
- * @returns {{ data: Record<string, string|string[]>, body: string, raw: string, present: boolean, error: string|null }}
+ * @returns {{ data: Record<string, string|string[]|object>, body: string, raw: string, present: boolean, error: string|null }}
  */
 export function parseFrontmatter(source) {
   const match = source.match(FENCE)
@@ -43,7 +43,12 @@ export function parseFrontmatter(source) {
     // A key with no value (`summary:`) parses as null. Keep it as '' rather
     // than dropping it: the gate must tell a field that is present but empty —
     // a defect it reports — apart from a field that was never written.
-    else data[key] = value == null ? '' : String(value)
+    else if (value == null) data[key] = ''
+    // A map is kept as a map rather than stringified to "[object Object]", so a
+    // consumer that expects a scalar can SEE that it did not get one. Flattening
+    // it produced a plausible-looking string that passed every check.
+    else if (typeof value === 'object') data[key] = value
+    else data[key] = String(value)
   }
   return { data, body: source.slice(match[0].length), raw: match[1], present: true, error }
 }

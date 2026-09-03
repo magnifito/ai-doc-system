@@ -63,7 +63,7 @@ export function fixFrontmatter(root, config = loadConfig(root), { dryRun = false
 
     changed.push({
       path,
-      from: `${data.kind ?? '-'}/${data.module ?? '-'}`,
+      from: `${data.kind || '-'}/${data.module || '-'}`,
       to: `${kind}/${moduleKey ?? '-'}`,
     })
     if (dryRun) continue

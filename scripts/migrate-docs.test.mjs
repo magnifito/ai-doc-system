@@ -12,6 +12,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
+import { parseFrontmatter } from './docs-frontmatter.mjs'
 
 const SCRIPT = join(dirname(fileURLToPath(import.meta.url)), 'migrate-docs.mjs')
 
@@ -91,6 +92,27 @@ test('migration stamps module when the project declares modules', () => {
       const moved = readFileSync(join(root, 'docs/modules/crm/state/pipelines.md'), 'utf8')
       assert.match(moved, /kind: state/)
       assert.match(moved, /module: crm/)
+    },
+  )
+})
+
+test('a blank frontmatter value falls back instead of migrating as empty', () => {
+  withMigrated(
+    {
+      'docs/notes/thing.md': '---\ntitle:\nstatus: active\n---\n\n# Thing\n\nBody.\n',
+      'docs-migration.map.mjs':
+        'export function destinationFor(path) {\n' +
+        "  return path === 'docs/notes/thing.md' ? 'docs/engineering/thing.md' : null\n" +
+        '}\n',
+    },
+    (root) => {
+      const moved = readFileSync(join(root, 'docs/engineering/thing.md'), 'utf8')
+      assert.match(moved, /title: Thing/)
+      // Filled in place: a second `title:` line would make the block duplicate-
+      // keyed, which is unparseable YAML and fails the gate outright.
+      const { data, error } = parseFrontmatter(moved)
+      assert.equal(error, null)
+      assert.equal(data.title, 'Thing')
     },
   )
 })

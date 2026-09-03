@@ -162,14 +162,21 @@ export function checkDocs(root, config = loadConfig(root), options = {}) {
     // shows, so it must be a line: an empty value is a half-written field, and
     // a multi-line block would break the generated table.
     if ('summary' in data) {
-      const summary = data.summary ?? ''
-      if (summary.trim() === '') add('summary', path, 'summary', 'is present but empty — write one line or remove the field')
-      else if (summary.includes('\n')) add('summary', path, 'summary', 'must be one line')
+      const summary = data.summary
+      if (typeof summary !== 'string') {
+        add('summary', path, 'summary', 'must be one line of text, not a list or a map')
+      } else if (summary.trim() === '') {
+        add('summary', path, 'summary', 'is present but empty — write one line or remove the field')
+      } else if (summary.includes('\n')) {
+        add('summary', path, 'summary', 'must be one line')
+      }
     }
     if (data.source_url && !/^https?:\/\/\S+$/.test(data.source_url)) {
       add('source-url', path, 'source_url', `"${data.source_url}" is not an http(s) URL`)
     }
-    if (data.review_by && !isIsoDate(data.review_by)) add('date', path, 'review_by', `"${data.review_by}" is not an ISO date`)
+    if (data.review_by && !isIsoDate(data.review_by)) {
+      add('date', path, 'review_by', `"${data.review_by}" is not an ISO date`)
+    }
 
     // 8. per-kind required fields. Which kind demands what is configuration,
     // not a constant here, so three repositories can share this script.

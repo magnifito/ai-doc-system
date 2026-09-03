@@ -635,3 +635,10 @@ test('13e. a summary containing a pipe is escaped in the INDEX.md table', () => 
   const entry = { path: 'docs/engineering/x.md', title: 'X', kind: 'engineering', status: 'active', updated: '2026-08-17', summary: 'a | b' }
   assert.match(renderMarkdown([entry]), /a \\\| b/)
 })
+
+test('13f. a summary that is not one string is a violation, not a crash', () => {
+  const list = run({ 'docs/engineering/x.md': '---\ntitle: X\nkind: engineering\nstatus: active\nupdated: 2026-08-17\nsummary:\n  - one\n  - two\n---\n# X\n' })
+  assert.ok(list.some((v) => v.rule === 'summary' && /not a list or a map/.test(v.message)))
+  const map = run({ 'docs/engineering/x.md': '---\ntitle: X\nkind: engineering\nstatus: active\nupdated: 2026-08-17\nsummary:\n  a: b\n---\n# X\n' })
+  assert.ok(map.some((v) => v.rule === 'summary' && /not a list or a map/.test(v.message)))
+})
