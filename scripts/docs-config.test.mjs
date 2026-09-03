@@ -200,6 +200,10 @@ test('rules: defaults carry every known id at its default severity', () => {
   const config = withDerived(DEFAULTS)
   assert.equal(config.rules.link, 'error')
   assert.equal(config.rules['shipped-code'], 'warn')
+  // The advisory-only ids: never evaluated by the gate, tunable all the same.
+  assert.equal(config.rules['updated-drift'], 'warn')
+  assert.equal(config.rules['code-pointer'], 'warn')
+  assert.equal(config.rules['verification-drift'], 'warn')
 })
 
 test('rules: an override changes one severity and keeps the rest', () => {

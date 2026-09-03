@@ -25,7 +25,7 @@ import { join } from 'node:path'
 import { parseFrontmatter } from './docs-frontmatter.mjs'
 import { loadConfig } from './docs-config.mjs'
 import { isExempt, kindForPath } from './docs-taxonomy.mjs'
-import { lastCommitDate, listDocs, repoRoot } from './docs-fs.mjs'
+import { lastCommitDates, listDocs, repoRoot } from './docs-fs.mjs'
 import { runDirect } from './docs-run.mjs'
 
 /**
@@ -61,6 +61,9 @@ export function main() {
   const drifted = []
   const unverified = []
 
+  // One walk of the history, reused for every date lookup below.
+  const dates = lastCommitDates(root)
+
   for (const path of listDocs(root, config)) {
     if (isExempt(config, path)) continue
     const { data } = parseFrontmatter(readFileSync(join(root, path), 'utf8'))
@@ -71,14 +74,14 @@ export function main() {
     }
 
     if (data.updated) {
-      const committed = lastCommitDate(root, path)
+      const committed = dates.get(path) ?? ''
       if (committed && committed > data.updated) drifted.push({ path, stamped: data.updated, committed })
     }
 
     // A reflection document claims something is true as of `verified_on`. When
     // the code it points at has moved since, the claim is unverified.
     if (kindForPath(config, path) === 'state' && data.verified_on && data.code) {
-      const moved = lastCommitDate(root, data.code.split('#')[0].replace(/\/$/, ''))
+      const moved = dates.get(data.code.split('#')[0].replace(/\/$/, '')) ?? ''
       if (moved && moved > data.verified_on) {
         unverified.push({ path, verified: data.verified_on, code: data.code, moved })
       }
@@ -87,28 +90,37 @@ export function main() {
 
   const emit = reporter()
 
-  if (deadCode.length === 0) emit('docs advisory: every `code:` pointer resolves')
-  else {
-    emit(`docs advisory: ${deadCode.length} dead \`code:\` pointer(s)`)
-    for (const { path, target } of deadCode) emit(`  ${path} -> ${target}`)
+  /** A block carries its rule id, and a project silences it with `off`. */
+  const on = (id) => config.rules[id] !== 'off'
+
+  if (on('code-pointer')) {
+    if (deadCode.length === 0) emit('docs advisory [code-pointer]: every `code:` pointer resolves')
+    else {
+      emit(`docs advisory [code-pointer]: ${deadCode.length} dead \`code:\` pointer(s)`)
+      for (const { path, target } of deadCode) emit(`  ${path} -> ${target}`)
+    }
   }
 
-  if (drifted.length === 0) emit('docs advisory: no `updated:` drift')
-  else {
-    emit(`docs advisory: ${drifted.length} doc(s) committed after their \`updated:\` date`)
-    for (const { path, stamped, committed } of drifted.slice(0, DRIFT_CAP)) {
-      emit(`  ${path} — frontmatter ${stamped}, last commit ${committed}`)
+  if (on('updated-drift')) {
+    if (drifted.length === 0) emit('docs advisory [updated-drift]: no `updated:` drift')
+    else {
+      emit(`docs advisory [updated-drift]: ${drifted.length} doc(s) committed after their \`updated:\` date`)
+      for (const { path, stamped, committed } of drifted.slice(0, DRIFT_CAP)) {
+        emit(`  ${path} — frontmatter ${stamped}, last commit ${committed}`)
+      }
+      if (drifted.length > DRIFT_CAP) emit(`  … and ${drifted.length - DRIFT_CAP} more`)
     }
-    if (drifted.length > DRIFT_CAP) emit(`  … and ${drifted.length - DRIFT_CAP} more`)
   }
 
-  if (unverified.length === 0) emit('docs advisory: no verification drift')
-  else {
-    emit(`docs advisory: ${unverified.length} state doc(s) whose code changed after \`verified_on\``)
-    for (const { path, verified, code, moved } of unverified.slice(0, DRIFT_CAP)) {
-      emit(`  ${path} — verified ${verified}, ${code} changed ${moved}`)
+  if (on('verification-drift')) {
+    if (unverified.length === 0) emit('docs advisory [verification-drift]: no verification drift')
+    else {
+      emit(`docs advisory [verification-drift]: ${unverified.length} state doc(s) whose code changed after \`verified_on\``)
+      for (const { path, verified, code, moved } of unverified.slice(0, DRIFT_CAP)) {
+        emit(`  ${path} — verified ${verified}, ${code} changed ${moved}`)
+      }
+      if (unverified.length > DRIFT_CAP) emit(`  … and ${unverified.length - DRIFT_CAP} more`)
     }
-    if (unverified.length > DRIFT_CAP) emit(`  … and ${unverified.length - DRIFT_CAP} more`)
   }
 
   emit.flush()

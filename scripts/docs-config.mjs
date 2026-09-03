@@ -39,6 +39,11 @@ export const RULES = {
   'shipped-code': 'warn',
   upstream: 'warn',
   review: 'warn',
+  // Advisory-only: reported by the advisory pass, never evaluated by the gate.
+  // `off` silences the corresponding report block.
+  'updated-drift': 'warn',
+  'code-pointer': 'warn',
+  'verification-drift': 'warn',
 }
 
 /** The severities a rule may carry. */

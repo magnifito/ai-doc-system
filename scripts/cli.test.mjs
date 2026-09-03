@@ -81,6 +81,23 @@ test('advisory writes to GITHUB_STEP_SUMMARY when the variable is set', () => {
   }
 })
 
+test('advisory skips a block whose rule is configured off', () => {
+  const doc =
+    '---\ntitle: A\nkind: engineering\nstatus: active\nupdated: 2026-08-27\ncode: src/nowhere.ts\n---\n\n# A\n'
+  const root = gitFixture({
+    'docs-system.config.json': JSON.stringify({ rules: { 'code-pointer': 'off' } }),
+    'docs/engineering/a.md': doc,
+  })
+  try {
+    const out = cli(['advisory'], { cwd: root })
+    assert.doesNotMatch(out, /code-pointer/)
+    assert.doesNotMatch(out, /dead `code:` pointer/)
+    assert.match(out, /\[updated-drift\]/)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
 test('a rule configured `warn` prints to stderr and still exits 0', () => {
   const root = gitFixture({
     'docs-system.config.json': JSON.stringify({ rules: { implements: 'warn' } }),

@@ -30,6 +30,43 @@ export function listDocs(root, config = loadConfig(root)) {
   }
 }
 
+/**
+ * Last commit date for EVERY path, from one `git log` walk. The advisory pass
+ * used to spawn one `git log` per document; on a few hundred documents that is
+ * a few hundred subprocesses. Newest commits come first, so the first time a
+ * path is seen wins. Directories are covered too: a directory's date is the
+ * newest date of any path beneath it.
+ */
+export function lastCommitDates(root) {
+  const dates = new Map()
+  let out
+  try {
+    out = execFileSync('git', ['log', '--name-only', '--format=%x00%ad', '--date=short'], {
+      cwd: root,
+      encoding: 'utf8',
+      maxBuffer: 1 << 28,
+    })
+  } catch {
+    return dates
+  }
+  let current = ''
+  for (const line of out.split('\n')) {
+    if (line.startsWith('\0')) {
+      current = line.slice(1).trim()
+      continue
+    }
+    const path = line.trim()
+    if (!path) continue
+    if (!dates.has(path)) dates.set(path, current)
+    let dir = path
+    while (dir.includes('/')) {
+      dir = dir.slice(0, dir.lastIndexOf('/'))
+      if (!dates.has(dir)) dates.set(dir, current)
+    }
+  }
+  return dates
+}
+
 /** Last commit date for a path, ISO. Empty string for an uncommitted file. */
 export function lastCommitDate(root, path) {
   try {
