@@ -84,7 +84,7 @@ On pull requests, add two more steps. `check --format github --base origin/<defa
 **blocking** — it exits 1 on any error, exactly as a plain `check` does — and it annotates the
 offending file (there are no line numbers yet) and adds the two history-aware rules (`transition`,
 `promoted-verbatim`). `impact --base origin/<default>` lists the documents whose claims cover the
-changed paths, into the job summary; `impact` is the one that always exits 0 — it reports, it does
+changed paths, into the job summary; `impact` is the one that always exits 0 (2 only on a malformed `--base`) — it reports, it does
 not judge.
 
 ## 3. Migrate

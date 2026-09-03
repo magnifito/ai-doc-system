@@ -74,6 +74,7 @@ jobs:
           # a `files` entry left out, or a script the dispatcher cannot reach,
           # shows up here and nowhere else.
           npx ai-doc-system new docs/product/hello.md --title Hello --summary "First doc."
+          echo node_modules > .gitignore
           git add -A
           git -c user.name=ci -c user.email=ci@example.com commit -qm smoke
           npx ai-doc-system mv docs/product/hello.md docs/engineering/hello.md

@@ -30,7 +30,7 @@ into an explicitly non-binding idea bank, and it is checkable by machine.
 | `new <path>` | Writes a document that passes the gate on its first run — `kind` from the path, the tier's forced status where the tier has one, else `--status`, else `draft`, today's date — and regenerates the index. |
 | `mv <from> <to>` | The mechanical half of a promotion: `git mv`, restamp `kind`/`module`/`status`, restamp `updated` to today, record `promoted_from`, regenerate. The prose rewrite stays yours. |
 | `verify` | Runs command-form `evidence`, hashes path-form evidence into `docs/evidence-lock.json`, and with `--stamp` sets `verified_on`. Explicit invocation only — see below. |
-| `impact` | The reverse question: which documents claim the paths this change touched. Advisory, exits 0, writes to the GitHub step summary. |
+| `impact` | The reverse question: which documents claim the paths this change touched. Advisory, exits 0 (2 only on a malformed `--base`), writes to the GitHub step summary. |
 | `context` / `export` | Documents with an `AUTHORITY:` banner inside a budget — whole documents are dropped, never truncated, and the first document is always emitted whole — and the same selection as JSONL (one record per heading) for RAG stores. |
 | `advisory` | Non-blocking: dead `code:` pointers, `updated:`-versus-git drift, `state` docs whose code moved after `verified_on`. |
 | `fix` | Restamps `kind` and `module` across the tree after a move. |

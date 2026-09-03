@@ -104,3 +104,16 @@ branch. Numbering continues the backlog above.
 20. **The plan files ship in the tarball.** `files` includes `docs`, so `docs/plans/*.md` — this
     backlog and the architecture plan — are published to npm. Either narrow `files` to the documents
     a consumer needs or accept it explicitly.
+21. **`promoted-verbatim` compares only the origin's newest revision within the branch.** When a
+    branch creates the origin, edits it, then promotes it, a promoted body identical to the FIRST
+    revision passes. `showLastInRange` in `scripts/docs-fs.mjs` should yield every revision of the
+    origin in `base..HEAD`, or the revision at the promoting commit's parent.
+22. **`verifyDocs()` called programmatically overwrites an unreadable lock.** The refusal lives in
+    `main()` of `scripts/verify-docs.mjs`; the function itself ignores `lock.error` and writes an
+    empty lock. Propagate the error before the write so an embedder gets the same protection.
+23. **The `modules/*/README.md` exemption is a literal glob.** `moduleRoot` is configurable, so a
+    project with `moduleRoot: "areas/"` still gets `frontmatter` errors on the READMEs `gen` writes.
+    Derive the pattern from `moduleRoot` in `withDerived` in `scripts/docs-config.mjs`.
+24. **`gen` crashes when a configured module directory is absent.** `writeIndex` in
+    `scripts/gen-docs-index.mjs` writes the per-module README without creating its directory
+    (`ENOENT`). One `mkdirSync(dirname(target), { recursive: true })` fixes it.

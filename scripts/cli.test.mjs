@@ -417,6 +417,14 @@ test('a value flag given without a value is a usage error, not a silently skippe
       assert.equal(stdout, '', `${args.join(' ')} must print nothing on stdout`)
       assert.ok(stderr.includes(message), `${args.join(' ')} must say "${message}", got: ${stderr}`)
     }
+    // A single leading dash is free text, not a flag: a title may start with it.
+    const dashed = cliResult(
+      ['new', 'docs/product/dashed.md', '--title', '-1 experiment', '--summary', '-ish, but real.'],
+      { cwd: root },
+    )
+    assert.equal(dashed.status, 0, dashed.stderr)
+    const written = readFileSync(join(root, 'docs/product/dashed.md'), 'utf8')
+    assert.match(written, /^title: ["']?-1 experiment["']?$/m)
   } finally {
     rmSync(root, { recursive: true, force: true })
   }

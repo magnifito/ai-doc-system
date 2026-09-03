@@ -8,8 +8,9 @@
  * filter and verified the whole tree, `check --format` fell back to text.
  *
  * A flag that is present must have a value. `--base --json` is the same
- * mistake as a trailing `--base`, because no ref starts with `-`, so the next
- * token starting with `-` is refused too rather than swallowed as the value.
+ * mistake as a trailing `--base`, so a next token that is itself a flag
+ * (starts with `--`) is refused rather than swallowed as the value. A single
+ * dash is allowed: `--title "-1 experiment"` is free text, not a flag.
  */
 
 /** A flag was given without a value. Callers turn this into an exit-2 usage error. */
@@ -26,7 +27,7 @@ export function flagValue(argv, name) {
   const index = argv.indexOf(name)
   if (index === -1) return undefined
   const value = argv[index + 1]
-  if (value === undefined || value.startsWith('-')) throw new UsageError(`${name} needs a value`)
+  if (value === undefined || value.startsWith('--')) throw new UsageError(`${name} needs a value`)
   return value
 }
 
