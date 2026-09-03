@@ -60,6 +60,20 @@ test('lastCommitDates dates a directory from the newest path beneath it', () => 
   rmSync(root, { recursive: true, force: true })
 })
 
+/**
+ * `git log --name-only` C-quotes non-ASCII paths under the default
+ * `core.quotePath`, which would key the map as `"dir/caf\303\251.md"` and miss
+ * every lookup. The old per-path `git log -1 -- path` never saw those bytes.
+ */
+test('lastCommitDates keys non-ASCII paths raw, not C-quoted', () => {
+  const root = gitFixture({ 'dir/café.md': 'c' })
+  const dates = lastCommitDates(root)
+  assert.equal(dates.get('dir/café.md'), lastCommitDate(root, 'dir/café.md'))
+  assert.ok(dates.get('dir/café.md'))
+  for (const key of dates.keys()) assert.ok(!key.startsWith('"'), `C-quoted key: ${key}`)
+  rmSync(root, { recursive: true, force: true })
+})
+
 test('lastCommitDates is empty outside git', () => {
   const root = mkdtempSync(join(tmpdir(), 'docs-nogit-'))
   assert.equal(lastCommitDates(root).size, 0)

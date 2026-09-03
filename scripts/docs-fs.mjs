@@ -35,17 +35,22 @@ export function listDocs(root, config = loadConfig(root)) {
  * used to spawn one `git log` per document; on a few hundred documents that is
  * a few hundred subprocesses. Newest commits come first, so the first time a
  * path is seen wins. Directories are covered too: a directory's date is the
- * newest date of any path beneath it.
+ * newest date of any path beneath it. A path renamed away is dated by its last
+ * content commit, not by the rename that retired it.
+ *
+ * `core.quotePath=false` is not optional: the default C-quotes any non-ASCII
+ * path, so `dir/café.md` would arrive as `"dir/caf\303\251.md"` and never
+ * match a lookup.
  */
 export function lastCommitDates(root) {
   const dates = new Map()
   let out
   try {
-    out = execFileSync('git', ['log', '--name-only', '--format=%x00%ad', '--date=short'], {
-      cwd: root,
-      encoding: 'utf8',
-      maxBuffer: 1 << 28,
-    })
+    out = execFileSync(
+      'git',
+      ['-c', 'core.quotePath=false', 'log', '--name-only', '--format=%x00%ad', '--date=short'],
+      { cwd: root, encoding: 'utf8', maxBuffer: 1 << 28, stdio: ['ignore', 'pipe', 'pipe'] },
+    )
   } catch {
     return dates
   }
@@ -73,6 +78,7 @@ export function lastCommitDate(root, path) {
     return execFileSync('git', ['log', '-1', '--format=%ad', '--date=short', '--', path], {
       cwd: root,
       encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
     }).trim()
   } catch {
     return ''

@@ -3,22 +3,23 @@
  * ADVISORY documentation checks — reported, never blocking. Wire it wherever
  * the host project keeps its non-blocking checks; it always exits 0.
  *
- * Two things the blocking gate deliberately refuses to assert (design section 5.3
- * — github.com/magnifito/ai-doc-system), because either one would fail a push for
- * a reason unrelated to the change that triggered it:
+ * Three things the blocking gate deliberately refuses to assert (design section
+ * 5.3 — github.com/magnifito/ai-doc-system), because any one of them would fail
+ * a push for a reason unrelated to the change that triggered it:
  *
- *   1. `code:` pointers that no longer resolve. An ordinary refactor moves a
- *      directory; the doc is then wrong, but the refactor is not.
- *   2. `updated:` drift — a file whose last commit date is later than the date
+ *   1. `code-pointer` — `code:` pointers that no longer resolve. An ordinary
+ *      refactor moves a directory; the doc is then wrong, but the refactor is not.
+ *   2. `updated-drift` — a file whose last commit date is later than the date
  *      its author stamped. The field means "last substantive change, per the
  *      author" (section 4.6), so a whitespace commit legitimately moves git's
  *      date and not the field's.
- *   3. VERIFICATION drift — a `state` document whose `code:` has changed since
+ *   3. `verification-drift` — a `state` document whose `code:` has changed since
  *      its `verified_on`. The claim is unverified, not wrong. Blocking would let
  *      any commit under `code:` fail the docs gate, which is how a gate gets
  *      bypassed rather than fixed.
  *
- * All three are worth knowing and none is worth blocking on.
+ * All three are worth knowing and none is worth blocking on. Each is a rule id:
+ * a project silences one block by setting that id to `off`.
  */
 import { appendFileSync, readFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
