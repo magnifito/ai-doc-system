@@ -52,8 +52,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- The Claude Code plugin is now named `ai-document-system`: install with
-  `/plugin install ai-document-system@magnifito`. Anyone who installed `ai-doc-system@magnifito`
+- The Claude Code plugin is now named `docs-notary`: install with
+  `/plugin install docs-notary@magnifito`. Anyone who installed `ai-doc-system@magnifito`
   reinstalls once. The npm package `@puralex/ai-doc-system` and the `ai-doc-system` command are
   unchanged.
 - Upgrade step: run `ai-doc-system gen` once after upgrading — `index.json` gains `by_code`
