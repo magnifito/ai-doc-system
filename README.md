@@ -224,10 +224,10 @@ Or install as a Claude Code plugin and let an agent drive it:
 
 ```
 /plugin marketplace add magnifito/ai-doc-system
-/plugin install ai-doc-system@magnifito
+/plugin install ai-document-system@magnifito
 ```
 
-(A plain `git clone https://github.com/magnifito/ai-doc-system ~/.claude/skills/ai-doc-system`
+(A plain `git clone https://github.com/magnifito/ai-doc-system ~/.claude/skills/ai-document-system`
 also works — the repo carries its own `.claude-plugin/plugin.json`.)
 
 Then, in the target repository, ask for the documentation system. [`SKILL.md`](SKILL.md) is the

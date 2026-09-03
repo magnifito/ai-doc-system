@@ -1,5 +1,5 @@
 ---
-name: ai-doc-system
+name: ai-document-system
 description: Use when a repository's docs/ tree is unnavigable, misleading, or unenforced — when an agent cannot tell whether a document describes something the product has, has committed to, or will never build. Tiers docs/ by authority, puts validated frontmatter on every file, generates an agent-readable index, and adds a blocking gate. Also use to add a document to a tree that already has this system, or to promote a reference document into committed scope.
 ---
 
