@@ -1,6 +1,6 @@
 {
   "generated": "scripts/gen-docs-index.mjs",
-  "count": 4,
+  "count": 5,
   "docs": [
     {
       "path": "docs/engineering/adr/0001-store-kind-in-frontmatter.md",
@@ -34,6 +34,15 @@
       "kind": "plan",
       "status": "active",
       "updated": "2026-09-03"
+    },
+    {
+      "path": "docs/plans/skills-2026-09.md",
+      "title": "Five skills under docs-notary",
+      "summary": "Split the single root SKILL.md into five situation-triggered plugin skills under skills/, with a test that keeps them honest.",
+      "kind": "plan",
+      "status": "active",
+      "updated": "2026-09-03",
+      "implements": "docs/plans/architecture-2026-09.md"
     }
   ],
   "by_code": {}
