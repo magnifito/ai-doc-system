@@ -413,6 +413,12 @@ export function trackedDocRefs(root, config = loadConfig(root)) {
 
 const PRINT_CAP = 100
 
+/** The value after `name` on the command line, or null when it is absent. */
+function flagValue(name) {
+  const index = process.argv.indexOf(name)
+  return index === -1 ? null : process.argv[index + 1]
+}
+
 export function main() {
   const violations = checkDocs(repoRoot())
   const cap = process.argv.includes('--all') ? Infinity : PRINT_CAP
@@ -420,6 +426,33 @@ export function main() {
   // exit code, so a `warn` rule can be adopted before it is enforced.
   const errors = violations.filter((violation) => violation.severity === 'error')
   const warnings = violations.filter((violation) => violation.severity === 'warn')
+
+  // Machine-readable modes come first, and each one owns the whole output: a
+  // consumer parsing stdout must not have to strip the human report out of it.
+  // Both carry warnings (with their severity) and both exit exactly as the text
+  // mode would, so switching format never changes whether the gate blocks.
+  if (process.argv.includes('--json')) {
+    const report = { ok: errors.length === 0, errors: errors.length, warnings: warnings.length, violations }
+    process.stdout.write(`${JSON.stringify(report, null, 2)}\n`)
+    process.exit(errors.length === 0 ? 0 : 1)
+  }
+
+  const format = flagValue('--format') ?? 'text'
+  if (format === 'github') {
+    for (const violation of violations) {
+      const level = violation.severity === 'error' ? 'error' : 'warning'
+      // `(repo)` is the pseudo-file of the cross-tree reference scan: there is
+      // no line for Actions to annotate, so the property is left off entirely.
+      const file = violation.file === '(repo)' ? '' : `file=${violation.file},`
+      process.stdout.write(`::${level} ${file}title=${violation.rule}::${violation.field} — ${violation.message}\n`)
+    }
+    process.exit(errors.length === 0 ? 0 : 1)
+  }
+  if (format !== 'text') {
+    console.error(`usage: check --format text|github — "${format}" is not a format`)
+    process.exit(2)
+  }
+
   for (const { rule, file, field, message } of warnings) {
     console.error(`${file}:${field} — ${message} [${rule}, warn]`)
   }

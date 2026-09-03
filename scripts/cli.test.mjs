@@ -114,3 +114,75 @@ test('a rule configured `warn` prints to stderr and still exits 0', () => {
     rmSync(root, { recursive: true, force: true })
   }
 })
+
+test('check --json prints a JSON report and still exits 1 on errors', () => {
+  const root = gitFixture({ 'docs/engineering/x.md': '# no frontmatter\n' })
+  try {
+    cli(['gen'], { cwd: root })
+    cli(['check', '--json'], { cwd: root })
+    assert.fail('should have exited 1')
+  } catch (error) {
+    assert.equal(error.status, 1)
+    const report = JSON.parse(error.stdout)
+    assert.equal(report.ok, false)
+    assert.ok(report.violations.some((v) => v.rule === 'frontmatter' && v.file === 'docs/engineering/x.md'))
+    assert.equal(typeof report.errors, 'number')
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('check --json on a clean tree reports ok and prints nothing else', () => {
+  const root = gitFixture({ 'docs/engineering/quality-gate.md': GOOD })
+  try {
+    cli(['gen'], { cwd: root })
+    const { status, stdout, stderr } = cliResult(['check', '--json'], { cwd: root })
+    assert.equal(status, 0)
+    assert.equal(stderr, '')
+    assert.deepEqual(JSON.parse(stdout), { ok: true, errors: 0, warnings: 0, violations: [] })
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('check --format github prints workflow annotations', () => {
+  const root = gitFixture({ 'docs/engineering/x.md': '# no frontmatter\n' })
+  try {
+    cli(['gen'], { cwd: root })
+    cli(['check', '--format', 'github'], { cwd: root })
+    assert.fail('should have exited 1')
+  } catch (error) {
+    assert.equal(error.status, 1)
+    assert.match(`${error.stdout}`, /^::error file=docs\/engineering\/x\.md,title=frontmatter::/m)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('check --format github annotates a warning as ::warning and exits 0', () => {
+  const root = gitFixture({
+    'docs-system.config.json': JSON.stringify({ rules: { implements: 'warn' } }),
+    'docs/engineering/b.md':
+      '---\ntitle: B\nkind: engineering\nstatus: active\nupdated: 2026-08-27\nimplements: docs/nowhere.md\n---\n\n# B\n',
+  })
+  try {
+    cli(['gen'], { cwd: root })
+    const { status, stdout } = cliResult(['check', '--format', 'github'], { cwd: root })
+    assert.equal(status, 0)
+    assert.match(stdout, /^::warning file=docs\/engineering\/b\.md,title=implements::implements — /m)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('check with an unknown --format exits 2 and names the formats', () => {
+  const root = gitFixture({ 'docs/engineering/quality-gate.md': GOOD })
+  try {
+    cli(['gen'], { cwd: root })
+    const { status, stderr } = cliResult(['check', '--format', 'xml'], { cwd: root })
+    assert.equal(status, 2)
+    assert.match(stderr, /usage: check --format text\|github/)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
