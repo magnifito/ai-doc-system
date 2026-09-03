@@ -1,5 +1,6 @@
 ---
 title: Technical debt and improvement backlog
+summary: Ranked defects and improvements found in a full read of the system on 2026-09-03.
 kind: plan
 status: active
 updated: 2026-09-03

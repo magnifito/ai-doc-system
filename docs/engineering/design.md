@@ -1,5 +1,6 @@
 ---
 title: "Design: a documentation system for agent-built repositories"
+summary: What the docs-by-authority system is, why each gate assertion exists, and how it is wired.
 kind: engineering
 status: active
 updated: 2026-08-27

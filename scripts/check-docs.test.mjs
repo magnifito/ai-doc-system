@@ -594,3 +594,44 @@ test('12a. shipped without code is a warning, not an error', () => {
   assert.ok(hit)
   assert.equal(hit.severity, 'warn')
 })
+
+test('13a. summary must be one non-empty line when present', () => {
+  const bad = run({ 'docs/engineering/x.md': doc({ title: 'X', kind: 'engineering', status: 'active', updated: '2026-08-17', summary: '""' }) })
+  assert.ok(bad.some((v) => v.rule === 'summary'))
+  const multi = run({ 'docs/engineering/x.md': '---\ntitle: X\nkind: engineering\nstatus: active\nupdated: 2026-08-17\nsummary: |\n  one\n  two\n---\n# X\n' })
+  assert.ok(multi.some((v) => v.rule === 'summary' && /one line/.test(v.message)))
+  const good = run({ 'docs/engineering/x.md': doc({ title: 'X', kind: 'engineering', status: 'active', updated: '2026-08-17', summary: 'What the gate asserts.' }) })
+  assert.ok(!good.some((v) => v.rule === 'summary'))
+})
+
+test('13b. source_url must be http(s) when present', () => {
+  const ref = (url) => doc({ title: 'R', kind: 'reference', status: 'reference', updated: '2026-08-17', source_url: url })
+  assert.ok(run({ 'docs/reference/r.md': ref('ftp://x') }).some((v) => v.rule === 'source-url'))
+  assert.ok(!run({ 'docs/reference/r.md': ref('https://example.test/doc') }).some((v) => v.rule === 'source-url'))
+})
+
+test('13c. the index carries summary, source_url and review_by', () => {
+  const root = fixture({
+    'docs/reference/r.md': doc({ title: 'R', kind: 'reference', status: 'reference', updated: '2026-08-17', summary: 'Captured.', source_url: 'https://example.test/doc', review_by: '2027-01-01' }),
+  })
+  try {
+    const [entry] = buildIndex(root)
+    assert.equal(entry.summary, 'Captured.')
+    assert.equal(entry.source_url, 'https://example.test/doc')
+    assert.equal(entry.review_by, '2027-01-01')
+    assert.match(renderMarkdown([entry]), /\| Summary \|/)
+    assert.match(renderMarkdown([entry]), /Captured\./)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('13d. review_by must be an ISO date when present', () => {
+  const violations = run({ 'docs/engineering/x.md': doc({ title: 'X', kind: 'engineering', status: 'active', updated: '2026-08-17', review_by: 'someday' }) })
+  assert.ok(violations.some((v) => v.rule === 'date' && v.field === 'review_by' && /ISO date/.test(v.message)))
+})
+
+test('13e. a summary containing a pipe is escaped in the INDEX.md table', () => {
+  const entry = { path: 'docs/engineering/x.md', title: 'X', kind: 'engineering', status: 'active', updated: '2026-08-17', summary: 'a | b' }
+  assert.match(renderMarkdown([entry]), /a \\\| b/)
+})

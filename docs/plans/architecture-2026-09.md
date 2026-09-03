@@ -1,5 +1,6 @@
 ---
 title: "Architecture round 2026-09: rule engine, impact, verify, hooks, transitions, context packs, and the debt backlog"
+summary: The 2026-09 build plan — rule engine, impact, verify, hooks, transitions, context packs.
 kind: plan
 status: active
 updated: 2026-09-03

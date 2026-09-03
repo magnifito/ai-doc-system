@@ -26,17 +26,20 @@ export function buildIndex(root, config = loadConfig(root)) {
     entries.push({
       path,
       title: data.title ?? '',
+      ...(data.summary ? { summary: data.summary } : {}),
       kind: kindForPath(config, path) ?? '',
       // Omitted rather than empty when the project declares no modules, so a
       // tree that does not use the axis keeps a byte-identical index.
       ...(moduleForPath(config, path) ? { module: moduleForPath(config, path) } : {}),
       status: data.status ?? '',
       updated: data.updated ?? '',
+      ...(data.review_by ? { review_by: data.review_by } : {}),
       ...(data.verified_on ? { verified_on: data.verified_on } : {}),
       ...(data.commitment ? { commitment: data.commitment } : {}),
       ...(Array.isArray(data.changes) && data.changes.length > 0 ? { changes: data.changes } : {}),
       ...(data.implements ? { implements: data.implements } : {}),
       ...(data.code ? { code: data.code } : {}),
+      ...(data.source_url ? { source_url: data.source_url } : {}),
       ...(data.superseded_by ? { superseded_by: data.superseded_by } : {}),
     })
   }
@@ -88,11 +91,12 @@ export function renderMarkdown(entries, config) {
     out.push(`## ${kind} (${group.length})`, '')
     for (const [area, rows] of groupByArea(resolved, group, kind)) {
       if (area) out.push(`### ${area} (${rows.length})`, '')
-      out.push('| Document | Status | Updated |', '|---|---|---|')
+      out.push('| Document | Status | Updated | Summary |', '|---|---|---|---|')
       for (const entry of rows) {
         const label = (entry.title || entry.path).replace(/\|/g, '\\|')
         const href = entry.path.slice(resolved.docsDir.length + 1)
-        out.push(`| [${label}](${href}) | \`${entry.status}\` | ${entry.updated} |`)
+        const summary = (entry.summary ?? '').replace(/\|/g, '\\|')
+        out.push(`| [${label}](${href}) | \`${entry.status}\` | ${entry.updated} | ${summary} |`)
       }
       out.push('')
     }

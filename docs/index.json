@@ -5,6 +5,7 @@
     {
       "path": "docs/engineering/design.md",
       "title": "Design: a documentation system for agent-built repositories",
+      "summary": "What the docs-by-authority system is, why each gate assertion exists, and how it is wired.",
       "kind": "engineering",
       "status": "active",
       "updated": "2026-08-27"
@@ -12,6 +13,7 @@
     {
       "path": "docs/plans/architecture-2026-09.md",
       "title": "Architecture round 2026-09: rule engine, impact, verify, hooks, transitions, context packs, and the debt backlog",
+      "summary": "The 2026-09 build plan — rule engine, impact, verify, hooks, transitions, context packs.",
       "kind": "plan",
       "status": "active",
       "updated": "2026-09-03",
@@ -20,6 +22,7 @@
     {
       "path": "docs/plans/debt.md",
       "title": "Technical debt and improvement backlog",
+      "summary": "Ranked defects and improvements found in a full read of the system on 2026-09-03.",
       "kind": "plan",
       "status": "active",
       "updated": "2026-09-03"

@@ -6,13 +6,13 @@
 
 ## engineering (1)
 
-| Document | Status | Updated |
-|---|---|---|
-| [Design: a documentation system for agent-built repositories](engineering/design.md) | `active` | 2026-08-27 |
+| Document | Status | Updated | Summary |
+|---|---|---|---|
+| [Design: a documentation system for agent-built repositories](engineering/design.md) | `active` | 2026-08-27 | What the docs-by-authority system is, why each gate assertion exists, and how it is wired. |
 
 ## plan (2)
 
-| Document | Status | Updated |
-|---|---|---|
-| [Architecture round 2026-09: rule engine, impact, verify, hooks, transitions, context packs, and the debt backlog](plans/architecture-2026-09.md) | `active` | 2026-09-03 |
-| [Technical debt and improvement backlog](plans/debt.md) | `active` | 2026-09-03 |
+| Document | Status | Updated | Summary |
+|---|---|---|---|
+| [Architecture round 2026-09: rule engine, impact, verify, hooks, transitions, context packs, and the debt backlog](plans/architecture-2026-09.md) | `active` | 2026-09-03 | The 2026-09 build plan — rule engine, impact, verify, hooks, transitions, context packs. |
+| [Technical debt and improvement backlog](plans/debt.md) | `active` | 2026-09-03 | Ranked defects and improvements found in a full read of the system on 2026-09-03. |

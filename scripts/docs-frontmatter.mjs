@@ -40,7 +40,10 @@ export function parseFrontmatter(source) {
   const data = {}
   for (const [key, value] of Object.entries(parsed)) {
     if (Array.isArray(value)) data[key] = value.map((item) => String(item))
-    else if (value != null) data[key] = String(value)
+    // A key with no value (`summary:`) parses as null. Keep it as '' rather
+    // than dropping it: the gate must tell a field that is present but empty —
+    // a defect it reports — apart from a field that was never written.
+    else data[key] = value == null ? '' : String(value)
   }
   return { data, body: source.slice(match[0].length), raw: match[1], present: true, error }
 }
@@ -48,17 +51,21 @@ export function parseFrontmatter(source) {
 /** Field order is fixed so a regenerated block is byte-identical to a committed one. */
 export const FIELD_ORDER = [
   'title',
+  'summary',
   'kind',
   'module',
   'status',
   'updated',
+  'review_by',
   'verified_on',
   'evidence',
   'commitment',
   'changes',
   'implements',
   'code',
+  'source_url',
   'superseded_by',
+  'promoted_from',
 ]
 
 /** Fields rendered as a block sequence rather than a scalar. */

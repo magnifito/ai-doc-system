@@ -89,3 +89,18 @@ test('an unparseable block reports the parse error', () => {
   assert.equal(present, true)
   assert.match(error, /Nested mappings/)
 })
+
+test('renders the authority fields in field order', () => {
+  assert.equal(
+    renderFrontmatter({ title: 'T', source_url: 'https://x', summary: 'S', kind: 'reference' }),
+    '---\ntitle: T\nsummary: S\nkind: reference\nsource_url: "https://x"\n---\n',
+  )
+})
+
+test('an empty scalar is kept as an empty string, not dropped', () => {
+  // The gate has to tell "summary: " (present but empty — a defect) apart from
+  // no `summary:` line at all, so a null value survives the read as ''.
+  const { data } = parseFrontmatter('---\ntitle: X\nsummary:\n---\n')
+  assert.equal(data.summary, '')
+  assert.ok('summary' in data)
+})
