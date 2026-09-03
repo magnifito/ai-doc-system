@@ -186,3 +186,23 @@ test('check with an unknown --format exits 2 and names the formats', () => {
     rmSync(root, { recursive: true, force: true })
   }
 })
+
+test('check --format github escapes workflow-command metacharacters', () => {
+  const root = gitFixture({
+    // A double-quoted YAML scalar carrying a real newline: the value is
+    // author-written, and unescaped it would end the annotation mid-line.
+    'docs/engineering/c.md':
+      '---\ntitle: C\nkind: engineering\nstatus: active\nupdated: 2026-08-27\nimplements: "docs/a\\nb.md"\n---\n\n# C\n',
+  })
+  try {
+    cli(['gen'], { cwd: root })
+    const { status, stdout } = cliResult(['check', '--format', 'github'], { cwd: root })
+    assert.equal(status, 1)
+    const lines = stdout.split('\n').filter((line) => line !== '')
+    assert.ok(lines.length > 0)
+    for (const line of lines) assert.match(line, /^::(error|warning) /)
+    assert.match(stdout, /::error file=docs\/engineering\/c\.md,title=implements::implements — points at "docs\/a%0Ab\.md"/)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})

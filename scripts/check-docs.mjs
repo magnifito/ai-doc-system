@@ -413,6 +413,24 @@ export function trackedDocRefs(root, config = loadConfig(root)) {
 
 const PRINT_CAP = 100
 
+/**
+ * GitHub workflow commands are line-oriented, and every part of an annotation
+ * below is author-written frontmatter: a value carrying a newline would end the
+ * command mid-message and leave the rest as an orphan log line, and one
+ * carrying `,` or `:` inside a property would forge a property. The runner's
+ * documented escaping is percent-encoding — `%` first, so it cannot re-encode
+ * the escapes that follow it.
+ * https://docs.github.com/actions/reference/workflow-commands-for-github-actions
+ */
+function escapeData(value) {
+  return `${value}`.replaceAll('%', '%25').replaceAll('\r', '%0D').replaceAll('\n', '%0A')
+}
+
+/** `escapeData` plus the two characters that delimit a property list. */
+function escapeProperty(value) {
+  return escapeData(value).replaceAll(':', '%3A').replaceAll(',', '%2C')
+}
+
 /** The value after `name` on the command line, or null when it is absent. */
 function flagValue(name) {
   const index = process.argv.indexOf(name)
@@ -443,8 +461,9 @@ export function main() {
       const level = violation.severity === 'error' ? 'error' : 'warning'
       // `(repo)` is the pseudo-file of the cross-tree reference scan: there is
       // no line for Actions to annotate, so the property is left off entirely.
-      const file = violation.file === '(repo)' ? '' : `file=${violation.file},`
-      process.stdout.write(`::${level} ${file}title=${violation.rule}::${violation.field} — ${violation.message}\n`)
+      const file = violation.file === '(repo)' ? '' : `file=${escapeProperty(violation.file)},`
+      const body = `${escapeData(violation.field)} — ${escapeData(violation.message)}`
+      process.stdout.write(`::${level} ${file}title=${escapeProperty(violation.rule)}::${body}\n`)
     }
     process.exit(errors.length === 0 ? 0 : 1)
   }
