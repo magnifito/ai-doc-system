@@ -22,10 +22,12 @@ function skills() {
 
 function skill(name) {
   const raw = readFileSync(join(SKILLS, name, 'SKILL.md'), 'utf8')
-  return { raw, ...parseFrontmatter(raw) }
+  // parseFrontmatter() returns its own `raw` (the frontmatter block only), so spread it
+  // first: the whole-file `raw` above must win, since every check here expects the full file.
+  return { ...parseFrontmatter(raw), raw }
 }
 
-test('all five skills exist', { todo: 'filled by Tasks 2 and 3' }, () => {
+test('all five skills exist', () => {
   assert.deepEqual(skills(), [...EXPECTED].sort())
 })
 
