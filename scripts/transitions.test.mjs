@@ -321,3 +321,66 @@ test('a document captured and promoted on the same branch is the tool\'s own out
     rmSync(root, { recursive: true, force: true })
   }
 })
+
+/**
+ * The same capture-and-promote, COMMITTED. A two-point diff cannot see a path
+ * that exists at neither end, so the origin is not in `changed` here and only
+ * the branch's own history says it was ever there.
+ */
+test('a capture and a promotion committed on one branch is clean, and still owes the prose rewrite', () => {
+  const captured = '# X\n\nTheir words, captured this morning: several sentences of a competitor\npage, because a real reference document is never one line long.\n'
+  const root = gitFixture({ 'README.md': '# Repo\n', 'docs/engineering/seed.md': '---\ntitle: Seed\nkind: engineering\nstatus: active\nupdated: 2026-08-17\n---\n# Seed\n\nSomething for the tree to hold before the branch starts.\n', })
+  const git = (...args) => execFileSync('git', args, { cwd: root, stdio: 'pipe' })
+  try {
+    regen(root)
+    commitAll(root)
+    git('branch', '-M', 'main')
+    git('checkout', '-qb', 'feature')
+
+    newDoc(root, 'docs/reference/x.md', { title: 'X', summary: 'Captured today.' })
+    rewriteBody(root, 'docs/reference/x.md', captured)
+    regen(root)
+    commitAll(root)
+    mvDoc(root, 'docs/reference/x.md', 'docs/product/x.md')
+    rewriteBody(root, 'docs/product/x.md', '# X\n\nOur words, describing what we are building.')
+    regen(root)
+    commitAll(root)
+
+    // (a) the whole promotion is history now, and none of it is a defect.
+    assert.deepEqual(promotionRules(checkDocs(root, undefined, { base: 'main' })), [])
+
+    // (b) the same promotion with the captured prose left verbatim: the origin
+    // is read from the commit that last held it, so the rewrite is still owed.
+    rewriteBody(root, 'docs/product/x.md', captured)
+    regen(root)
+    const verbatim = checkDocs(root, undefined, { base: 'main' }).filter((v) => v.rule === 'promoted-verbatim')
+    assert.equal(verbatim.length, 1)
+    assert.match(verbatim[0].message, /body is identical to docs\/reference\/x\.md before this branch moved it/)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('a promoted_from naming a path that existed nowhere is still reported, committed or not', () => {
+  const root = gitFixture({ 'README.md': '# Repo\n', 'docs/engineering/seed.md': '---\ntitle: Seed\nkind: engineering\nstatus: active\nupdated: 2026-08-17\n---\n# Seed\n\nSomething for the tree to hold before the branch starts.\n', })
+  const git = (...args) => execFileSync('git', args, { cwd: root, stdio: 'pipe' })
+  try {
+    regen(root)
+    commitAll(root)
+    git('branch', '-M', 'main')
+    git('checkout', '-qb', 'feature')
+    newDoc(root, 'docs/product/x.md', { title: 'X', summary: 'Ours.' })
+    rewriteBody(root, 'docs/product/x.md', '# X\n\nOur words.')
+    // A typo, or a path from another repository: the branch never touched it
+    // and the merge base never had it.
+    const text = readFileSync(join(root, 'docs/product/x.md'), 'utf8')
+    writeFileSync(join(root, 'docs/product/x.md'), text.replace('\n---\n', '\npromoted_from: docs/reference/nope.md\n---\n'))
+    regen(root)
+    commitAll(root)
+    const hit = checkDocs(root, undefined, { base: 'main' }).find((v) => v.rule === 'promoted-verbatim')
+    assert.ok(hit, 'an origin that existed nowhere must still be reported')
+    assert.match(hit.message, /names docs\/reference\/nope\.md, which did not exist at main/)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})

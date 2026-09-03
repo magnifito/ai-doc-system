@@ -54,7 +54,7 @@ import { EVIDENCE_PATH, LIST_FIELDS, SCALAR_FIELDS, parseFrontmatter } from './d
 import { loadConfig } from './docs-config.mjs'
 import { isIsoDate, today } from './docs-dates.mjs'
 import { isExempt, kindForPath, moduleForPath, pathHygieneErrors, reservedStatuses, statusForKind } from './docs-taxonomy.mjs'
-import { changedPaths, existsCaseExact, listDocs, mergeBase, refExists, renamedFrom, repoRoot, showAtRef } from './docs-fs.mjs'
+import { changedPaths, existsCaseExact, listDocs, mergeBase, refExists, renamedFrom, repoRoot, showAtRef, showLastInRange, touchedInRange } from './docs-fs.mjs'
 import { renderIndex } from './gen-docs-index.mjs'
 import { LOCK_FILE, LOCK_UNREADABLE, hashEvidence, parsePathEvidence, readLock } from './verify-docs.mjs'
 
@@ -338,13 +338,21 @@ export function checkDocs(root, config = loadConfig(root), options = {}) {
       const crossedTier = originPath !== path && kindForPath(config, originPath) !== kindForPath(config, path)
       const before = showAtRef(root, baseSha, originPath)
       if (data.promoted_from) {
-        // An origin the BRANCH created, renamed or deleted never existed at the
+        // An origin the BRANCH created and then moved away never existed at the
         // base, and saying so would reject this tool's own output: `new` a
-        // reference document and `mv` it to product on one branch and the
-        // origin is born and gone inside the same diff. The origin being in the
-        // changed set is exactly that case; a `promoted_from` naming a document
-        // the branch never touched is still the typo this check exists for.
-        if (before === null && !changed.has(data.promoted_from)) {
+        // reference document and `mv` it to product on one branch and the origin
+        // is born and gone between the two ends of the diff. So this fires only
+        // when the origin existed NOWHERE in the branch's history — not at the
+        // merge base, not in the uncommitted work (`changed`), and in no commit
+        // since the fork. The last of the three is the only one that survives
+        // committing the promotion: a two-point diff cannot see a path that is
+        // absent at both ends. A `promoted_from` the branch never touched at all
+        // is still the typo this check exists for.
+        if (
+          before === null &&
+          !changed.has(data.promoted_from) &&
+          !touchedInRange(root, baseSha, 'HEAD', data.promoted_from)
+        ) {
           add('promoted-verbatim', path, 'promoted_from', `names ${data.promoted_from}, which did not exist at ${options.base}`)
         }
         // A promotion is a move. Both copies alive means the tree now claims the
@@ -359,6 +367,10 @@ export function checkDocs(root, config = loadConfig(root), options = {}) {
         // where the prose came from has to survive the move.
         add('promoted-verbatim', path, 'promoted_from', `moved from ${renamedOrigin} across tiers without promoted_from — add promoted_from: ${renamedOrigin}`)
       }
+      // 10. transition, against the merge base and nothing else. What the
+      // document's status was at the fork is the only "before" this branch can
+      // be held to; a status the branch itself set on the way here is its own
+      // work, not an edge it has to justify.
       if (before !== null) {
         const prior = parseFrontmatter(before)
         const from = prior.data.status
@@ -368,10 +380,18 @@ export function checkDocs(root, config = loadConfig(root), options = {}) {
         if (from && to && from !== to && from in TRANSITIONS && to in TRANSITIONS && !TRANSITIONS[from].includes(to)) {
           add('transition', path, 'status', `${from} -> ${to} is not an allowed transition — allowed from ${from}: ${TRANSITIONS[from].join(', ') || 'nothing'}`)
         }
-        // Promotion without a rewrite is the failure the reference tier exists
-        // to prevent: someone else's prose, wearing this product's authority.
-        if ((data.promoted_from || crossedTier) && prior.body.trim() === body.trim()) {
-          add('promoted-verbatim', path, 'promoted_from', `body is identical to ${originPath} at ${options.base} — rewrite the prose to describe this product`)
+      }
+      // 11. promotion without a rewrite is the failure the reference tier
+      // exists to prevent: someone else's prose, wearing this product's
+      // authority. The prose to compare against is the origin at the merge
+      // base; when the branch itself captured the origin there is no copy
+      // there, so it is read from the last commit that held it. A capture and a
+      // promotion in one branch must still rewrite the prose.
+      if (data.promoted_from || crossedTier) {
+        const priorSource = before ?? showLastInRange(root, baseSha, 'HEAD', originPath)
+        const where = before === null ? 'before this branch moved it' : `at ${options.base}`
+        if (priorSource !== null && parseFrontmatter(priorSource).body.trim() === body.trim()) {
+          add('promoted-verbatim', path, 'promoted_from', `body is identical to ${originPath} ${where} — rewrite the prose to describe this product`)
         }
       }
     }

@@ -218,6 +218,54 @@ export function renamedFrom(root, ref) {
 }
 
 /**
+ * Whether any commit in `base..head` touched `path`.
+ *
+ * A two-point diff cannot answer this: a file created and then moved away
+ * inside one branch exists at neither end, so `changedPaths` never lists it,
+ * and "it was not at the merge base" reads as "it never existed". The branch's
+ * own history is the only place that distinction lives.
+ *
+ * `core.quotePath=false` for the same reason as `lastCommitDates`. Any git
+ * failure — no HEAD, an unresolvable range — answers false, which is the
+ * conservative reading: no evidence the branch touched it.
+ */
+export function touchedInRange(root, base, head, path) {
+  try {
+    const out = execFileSync(
+      'git',
+      ['-c', 'core.quotePath=false', 'log', '--format=%H', `${base}..${head}`, '--', path],
+      { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] },
+    )
+    return out.trim() !== ''
+  } catch {
+    return false
+  }
+}
+
+/**
+ * The content of `path` as the branch last held it: the newest commit in
+ * `base..head` that touched it, read at that commit, or at its parent when
+ * that commit is the one that removed it. Null when the branch never had it.
+ *
+ * This is what lets the verbatim check still run on a document captured and
+ * promoted inside one branch, where the merge base has no copy to compare.
+ */
+export function showLastInRange(root, base, head, path) {
+  let sha
+  try {
+    sha = execFileSync(
+      'git',
+      ['-c', 'core.quotePath=false', 'rev-list', '-1', `${base}..${head}`, '--', path],
+      { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] },
+    ).trim()
+  } catch {
+    return null
+  }
+  if (!sha) return null
+  return showAtRef(root, sha, path) ?? showAtRef(root, `${sha}^`, path)
+}
+
+/**
  * File content at `ref:path`, or null when it did not exist there. Used by the
  * git-aware assertions to read a document as it stood at the base ref: a
  * missing path and an unresolvable ref are the same answer here, because the
