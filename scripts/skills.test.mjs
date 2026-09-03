@@ -3,7 +3,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
-import { parseFrontmatter } from './docs-frontmatter.mjs'
+import { LIST_FIELDS, parseFrontmatter, SCALAR_FIELDS } from './docs-frontmatter.mjs'
 import { RULES } from './docs-config.mjs'
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)))
@@ -11,6 +11,9 @@ const SKILLS = join(ROOT, 'skills')
 const EXPECTED = ['docs-adopt', 'docs-write', 'docs-promote', 'docs-audit', 'docs-gate']
 // Claude Code truncates or rejects longer descriptions; the trigger must fit.
 const DESCRIPTION_MAX = 1024
+// The subcommands cli/cli.mjs dispatches. Kept by hand — importing that module would run the
+// dispatcher — so a command added or renamed there must be mirrored here in the same change. A
+// skill naming a command the CLI does not have sends the agent straight to a usage error.
 const COMMANDS = ['init', 'new', 'mv', 'check', 'verify', 'advisory', 'impact', 'context', 'export', 'gen', 'fix', 'migrate']
 
 function skills() {
@@ -67,7 +70,6 @@ test('every rule id docs-gate names is a key of RULES', () => {
   const { raw } = skill('docs-gate')
   // Rule ids appear as `[id]` in gate output and as a table's first column: `| \`id\` |`.
   const named = new Set([...raw.matchAll(/\| `([a-z-]+)` \|/g)].map((m) => m[1]))
-  assert.ok(named.size >= 20, `docs-gate lists ${named.size} rule ids; expected the full table`)
   for (const id of named) assert.ok(id in RULES, `docs-gate: unknown rule id "${id}"`)
   for (const id of Object.keys(RULES)) assert.ok(named.has(id), `docs-gate: rule "${id}" has no remedy row`)
 })
@@ -84,5 +86,33 @@ test('every skill hands off by naming a sibling skill, never a section number of
     const { raw } = skill(name)
     assert.doesNotMatch(raw, /§\s?[1-5]\b/, `${name}: section reference to the old SKILL.md`)
     assert.doesNotMatch(raw, /\bSKILL\.md\b/, `${name}: mentions SKILL.md by file name`)
+    // The five skills replaced one file, so each is a fragment of one workflow: a skill that names
+    // no sibling is a dead end for the agent that landed on the wrong one.
+    const siblings = EXPECTED.filter((other) => other !== name && raw.includes(other))
+    assert.ok(siblings.length > 0, `${name}: names no sibling skill to hand off to`)
   }
+})
+
+test('docs-write says which frontmatter fields take a list and which take one value', () => {
+  if (!skills().includes('docs-write')) return
+  // The field table's rows: `| \`field\` | when to write it | what the gate checks |`.
+  const rows = new Map(
+    skill('docs-write')
+      .raw.split('\n')
+      .filter((line) => /^\| `[a-z_]+` \|/.test(line))
+      .map((line) => [/^\| `([a-z_]+)` \|/.exec(line)[1], line]),
+  )
+  // "A list of …" is the phrase the table uses for a repeatable field. Saying it of a scalar field
+  // is the defect this guards: `code:` was documented as "a list of paths" while the writer
+  // normalises it as a single value, so an author following the skill wrote frontmatter the gate
+  // then rejected as a `vocabulary` violation.
+  const asList = /a list of/i
+  for (const field of LIST_FIELDS) {
+    assert.ok(rows.has(field), `docs-write: no field-table row for \`${field}\``)
+    assert.match(rows.get(field), asList, `docs-write: \`${field}\` is a list field; its row must say so`)
+  }
+  assert.ok(SCALAR_FIELDS.includes('code'), 'code is expected to be a scalar field')
+  assert.ok(rows.has('code'), 'docs-write: no field-table row for `code`')
+  assert.doesNotMatch(rows.get('code'), asList, 'docs-write: `code` takes one path, not a list')
+  assert.match(rows.get('code'), /\bone\b/i, 'docs-write: the `code` row must say it takes one path')
 })
