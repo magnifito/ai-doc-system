@@ -45,5 +45,5 @@ try {
   }
 } catch {
   // Silence is the safe failure: say nothing, block nothing.
+  process.exit(0)
 }
-process.exit(0)
