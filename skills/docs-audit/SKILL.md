@@ -36,7 +36,8 @@ ai-doc-system verify --only docs/<tier>/<name>.md --stamp
 It runs the document's command evidence, hashes its path evidence into `<docsDir>/evidence-lock.json`,
 and stamps `verified_on` only where everything passed — a date you can defend instead of one you
 typed. It skips a document with no `evidence:` list entirely, so it can never clear
-`verification-drift` on one that has `code:` but no evidence (see the table below). It is the only
+`verification-drift` on one that has `code:` but no evidence — add an `evidence:` entry, or move
+`verified_on` only after checking the code by hand. It is the only
 command that executes anything written in a document: the gate never runs it, the edit hook never
 runs it, and `ai-doc-system init` wires no script to it — a consumer's CI runs it only if someone
 adds that step by hand (this tool's own CI does, as a smoke test on the installed package). Invoke
@@ -49,7 +50,7 @@ on a branch you have not read.
 |---|---|
 | `updated-drift`: the document was committed after its `updated:` date | Read the diff since that date. Bump `updated` if the edit was substantive; otherwise leave it — a whitespace or generated-file commit does not need a new date. |
 | `code-pointer`: a `code:` path is gone | Find the new path and fix it, or remove the claim. A `shipped` document with no `code:` is an opinion. |
-| `verification-drift` / `evidence-lock` | Re-run `verify --only … --stamp`. If it fails, the document is wrong, not the lock. If the document has `code:` but no `evidence:` list, `verify` skips it — add an `evidence:` entry, or move `verified_on` only after checking the code by hand. |
+| `verification-drift`: on a `kind: state` document, the `code:` path was committed after `verified_on` (the default tiers produce no `state` kind) / `evidence-lock` | Re-run `verify --only … --stamp`. If it fails, the document is wrong, not the lock. |
 | `review` (`review_by` in the past) | Re-verify the claim. Move the date only after the check, never before. |
 | `upstream` (`implements` target moved on) | Read the target's change. Update this document or record why it does not apply. |
 | `shipped-code` | Add `code:` with a real path, or the status is `active`, not `shipped`. |

@@ -10,7 +10,9 @@ a move is a claim, and `check --base` verifies the claim against the branch's hi
 
 ## 1. Nothing in `reference/` may be implemented directly
 
-Promote it first, then **rewrite the prose to describe this product**:
+Installed as a plugin, `docs-notary`'s `reference-read` hook says so on every Read of a document
+whose status is `reference`: not a commitment, never a build spec, and here is the `mv` that
+promotes it. Promote it first, then **rewrite the prose to describe this product**:
 
 ```bash
 ai-doc-system mv docs/reference/<name>.md docs/product/<name>.md
@@ -59,8 +61,10 @@ moves freely. `reference/` forces `reference`; `archive/` forces `superseded`.
 
 When a newer document replaces an older one:
 
-1. Set `superseded_by: docs/<tier>/<new-name>.md` on the old file and `status: superseded`.
-2. Move it: `ai-doc-system mv docs/<tier>/<old-name>.md docs/archive/<old-name>.md`.
+1. Set `superseded_by: docs/<tier>/<new-name>.md` on the old file. Leave `status` alone —
+   `superseded` outside `archive/` is a `vocabulary` error.
+2. Move it: `ai-doc-system mv docs/<tier>/<old-name>.md docs/archive/<old-name>.md`. The
+   `archive/` tier forces `status: superseded`.
 3. Fix every link that pointed at it — the gate will not catch these; `link` only fails a target
    that is missing.
 
@@ -69,10 +73,10 @@ says. A "closed" plan that still lists untaken steps is a live backlog and stays
 
 ## 4. Moves within a tier and hand-made moves
 
-A rename inside one tier keeps status and needs no `promoted_from`; `mv` handles it. After a move
-made by hand, `ai-doc-system fix` restamps `kind` and `module` — the gate asserts they agree with
-the path. Renaming for case alone needs **two** `git mv`s through a temporary name on macOS and
-Windows.
+A rename inside one tier keeps status and needs no `promoted_from`; `mv` handles it, and sets
+`updated` to today as it does on any move. After a move made by hand, `ai-doc-system fix` restamps
+`kind` and `module` — the gate asserts they agree with the path. Renaming for case alone needs
+**two** `git mv`s through a temporary name on macOS and Windows.
 
 ## 5. Before you finish
 

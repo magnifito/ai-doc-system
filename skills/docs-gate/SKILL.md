@@ -1,6 +1,6 @@
 ---
 name: docs-gate
-description: Use when ai-doc-system check fails or warns — "check-docs FAILED", a GitHub annotation from check --format github, the plugin's edit hook reporting errors after a Write or Edit, or CI red on lint:docs. Reads the rule id in brackets, applies the one remedy that fixes the cause, and never silences a rule to make CI pass. Not for creating (docs-write), moving (docs-promote) or reviewing (docs-audit) documents.
+description: Use when ai-doc-system check fails — "check-docs FAILED", a GitHub annotation from check --format github, the plugin's edit hook reporting errors after a Write or Edit, or CI red on lint:docs. Reads the rule id in brackets, applies the one remedy that fixes the cause, and never silences a rule to make CI pass. Not for creating (docs-write), moving (docs-promote) or reviewing (docs-audit) documents.
 ---
 
 # Fix a red gate
@@ -20,6 +20,11 @@ Errors exit 1 and end `[rule]`; warnings print in full, exit 0 unless the projec
 end `[rule, warn]`. The cross-tree half of `link` — a tracked file outside the docs tree naming a
 dead path — has no line to point at, so its file reads `(repo)`; `--format github` carries the same
 id in `title=`. Under `--base <ref>` two more rules run against the branch's history.
+
+Exit 2 is not a violation. It is a usage error — a `--base` that does not resolve in this checkout,
+a `--format` that is neither `text` nor `github`, or a value flag with nothing after it. Fix the
+command line; the tree has not been judged yet. A long run prints only the first 100 errors unless
+you pass `--all`.
 
 ## Remedies by rule id
 
@@ -47,7 +52,7 @@ id in `title=`. Under `--base <ref>` two more rules run against the branch's his
 | `review` | `review_by` is in the past. | Re-verify the claim (docs-audit), then move the date. |
 | `updated-drift` | Advisory: the document was committed after the date its `updated:` field claims. | docs-audit. |
 | `code-pointer` | Advisory: a `code:` path is gone. | docs-audit. |
-| `verification-drift` | Advisory: evidence changed since `verified_on`. | docs-audit. |
+| `verification-drift` | Advisory: on a `kind: state` document, the `code:` path was committed after `verified_on`. The default tiers produce no `state` kind. | docs-audit. |
 
 ## When to touch the severity
 

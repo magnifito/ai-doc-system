@@ -1,6 +1,6 @@
 ---
 name: docs-write
-description: Use when adding a document to, or editing a document in, a repository that already has docs/index.json — a new spec, plan, ADR, runbook, or state document, or a substantive change to an existing one. Creates the file with ai-doc-system new so kind, status, updated and the index are right on the first gate run; explains every frontmatter field an author sets by hand (summary, evidence, code, implements, changes, source_url, review_by) and which the tools own. Not for moving, promoting or retiring a document (docs-promote) and not for a red gate (docs-gate).
+description: Use when adding a document to, or editing a document in, a repository that already has docs/index.json — a new spec, plan, ADR, runbook, or state document, or a substantive change to an existing one. Creates the file with ai-doc-system new so kind, status, updated and the index are right on the first gate run; explains every frontmatter field an author sets by hand (summary, evidence, code, implements, changes, source_url, review_by) and which the tools own. Not for changing a document's status, tier or place (docs-promote), and not for a red gate (docs-gate).
 ---
 
 # Write a document
@@ -53,11 +53,12 @@ asserted equal; `ai-doc-system fix` restamps them after a hand-made move), and `
 
 - **Write the prose for this product.** A document that restates someone else's assumptions is a
   `reference` document, whatever tier you put it in.
-- **Link with root-relative paths** (`docs/<tier>/<name>.md`). The gate resolves every link
-  case-exactly and fails a link to a file that does not exist. It does not read the target's
-  status — a link left pointing at a superseded document is yours to find.
+- **Link relatively** (`../engineering/design.md`) — that is what renders. The gate resolves
+  relative links from the file, and root-relative `docs/…` from the repo root; both pass, only the
+  first opens. Either way it must exist case-exactly. It does not read the target's status — a link
+  left pointing at a superseded document is yours to find.
 - **`updated:` is yours.** Bump it on a substantive edit. Nothing derives it from git, because the
-  git date moves on every whitespace commit. Typos and links do not bump it.
+  git date moves on every whitespace commit. Typos and links do not bump it; `mv` does.
 - **A status document without `evidence` is an opinion.** Give the gate a path or a command it can
   check; docs-audit will run it.
 

@@ -227,7 +227,8 @@ Or install as a Claude Code plugin and let an agent drive it:
 /plugin install docs-notary@magnifito
 ```
 
-(Without the plugin system, copy `skills/*` into `~/.claude/skills/`.)
+(Without the plugin system, clone the repo and copy `skills/*` into `~/.claude/skills/`; read
+`${CLAUDE_PLUGIN_ROOT}` in the skills as the path of your clone.)
 
 Then, in the target repository, ask for the documentation system; the `docs-adopt` skill runs the
 survey and the migration, and the other four take over once `docs/index.json` exists.
