@@ -188,21 +188,32 @@ const cache = new Map()
  * `evidenceRunners`) are ones where a project wants ITS entries as well as the
  * shipped ones, and a hand-copied default silently falls behind an upgrade.
  *
- * Runs before the merge, so `validate` only ever sees plain keys.
+ * Runs before the merge, so `validate` only ever sees plain keys — and OUTSIDE
+ * the JSON parse, so a misuse of `+` is reported as the config error it is
+ * rather than dressed up as a syntax error in a perfectly valid file.
  */
 function foldExtensions(overrides) {
   const out = {}
   for (const [key, value] of Object.entries(overrides)) {
+    // Editors resolve completion from `$schema`; it is metadata about the file,
+    // not a setting, so it is dropped here and never reaches the resolved config.
+    if (key === '$schema') continue
     if (!key.endsWith('+')) {
+      // Setting both forms is a mistake with no sensible reading: whichever the
+      // author meant, key order in the file would decide, silently.
+      if (`${key}+` in overrides) {
+        throw new Error(`${CONFIG_FILE}: "${key}" and "${key}+" cannot both be set`)
+      }
       out[key] = value
       continue
     }
     const base = key.slice(0, -1)
+    if (base in overrides) throw new Error(`${CONFIG_FILE}: "${base}" and "${key}" cannot both be set`)
     if (!Array.isArray(DEFAULTS[base])) {
       throw new Error(`${CONFIG_FILE}: "${key}" extends "${base}", which is not an array setting`)
     }
     if (!Array.isArray(value)) throw new Error(`${CONFIG_FILE}: "${key}" must be an array`)
-    out[base] = [...(out[base] ?? DEFAULTS[base]), ...value]
+    out[base] = [...DEFAULTS[base], ...value]
   }
   return out
 }
@@ -213,11 +224,13 @@ export function loadConfig(root) {
   const file = join(root, CONFIG_FILE)
   let overrides = {}
   if (existsSync(file)) {
+    let parsed
     try {
-      overrides = foldExtensions(JSON.parse(readFileSync(file, 'utf8')))
+      parsed = JSON.parse(readFileSync(file, 'utf8'))
     } catch (error) {
       throw new Error(`${CONFIG_FILE} is not valid JSON: ${error.message}`, { cause: error })
     }
+    overrides = foldExtensions(parsed)
   }
   const merged = { ...DEFAULTS, ...overrides }
   merged.rules = { ...RULES, ...(overrides.rules ?? {}) }
@@ -257,8 +270,6 @@ export function clearConfigCache() {
  */
 function validate(overrides, merged) {
   for (const key of Object.keys(overrides)) {
-    // Editors resolve completion from `$schema`; the loader has no use for it.
-    if (key === '$schema') continue
     if (!(key in DEFAULTS)) {
       throw new Error(`${CONFIG_FILE}: unknown key "${key}" — known keys are ${Object.keys(DEFAULTS).join(', ')}`)
     }

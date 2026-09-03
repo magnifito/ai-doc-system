@@ -242,6 +242,8 @@ test('a "+" key on a non-array default is rejected', () => {
     // the unknown-key path cannot satisfy this test by accident.
     assert.throws(() => loadConfig(root), /"docsDir\+"/)
     assert.throws(() => loadConfig(root), /not an array setting/)
+    // A config error is not a parse error: the JSON here is perfectly valid.
+    assert.throws(() => loadConfig(root), (error) => !/not valid JSON/.test(error.message))
   })
 })
 
@@ -258,6 +260,15 @@ test('a "$schema" key is allowed and ignored', () => {
     clearConfigCache()
     const config = loadConfig(root)
     assert.equal(config.docsDir, DEFAULTS.docsDir)
+    // Editor metadata, not a setting: it must not reach the resolved config.
+    assert.equal('$schema' in config, false)
+  })
+})
+
+test('a key and its "+" form together is rejected', () => {
+  withFixture({}, { sentinels: ['README'], 'sentinels+': ['SPEC'] }, (root) => {
+    clearConfigCache()
+    assert.throws(() => loadConfig(root), /"sentinels" and "sentinels\+" cannot both be set/)
   })
 })
 
