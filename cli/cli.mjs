@@ -16,6 +16,8 @@ const COMMANDS = {
   verify: ['verify-docs.mjs', 'RUNS command evidence (explicit only), hashes path evidence, --stamp verified_on'],
   advisory: ['check-docs-advisory.mjs', 'non-blocking drift report'],
   impact: ['impact-docs.mjs', 'documents whose claims cover the changed paths'],
+  context: ['context-docs.mjs', 'selected documents with an authority banner, within a budget'],
+  export: ['context-docs.mjs', 'one JSON record per heading (--jsonl) for RAG stores'],
   gen: ['gen-docs-index.mjs', 'regenerate INDEX.md and index.json'],
   fix: ['fix-docs-frontmatter.mjs', 'restamp kind/module after moves'],
   migrate: ['migrate-docs.mjs', 'one-shot migration (needs a map)'],
@@ -37,6 +39,10 @@ if (!COMMANDS[command]) {
   console.error('  --version  print the package version')
   process.exit(2)
 }
+
+// `export` is `context --jsonl`: the command word carries the flag so the
+// module keeps one entry point.
+if (command === 'export' && !process.argv.includes('--jsonl')) process.argv.push('--jsonl')
 
 const mod = await import(new URL(`../scripts/${COMMANDS[command][0]}`, import.meta.url))
 await mod.main()

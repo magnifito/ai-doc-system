@@ -316,3 +316,47 @@ test('check --base with a ref that does not resolve exits 2 rather than skipping
     rmSync(root, { recursive: true, force: true })
   }
 })
+
+test('context prints the authority banner for the selected documents', () => {
+  const root = gitFixture({ 'docs/product/p.md': '---\ntitle: P\nkind: product\nstatus: active\nupdated: 2026-08-27\n---\n\n# P\n\nBody.\n' })
+  try {
+    const stdout = cli(['context', '--kind', 'product'], { cwd: root })
+    assert.match(stdout, /===== docs\/product\/p\.md =====/)
+    assert.match(stdout, /AUTHORITY: agreed and current — build from this\./)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('export implies --jsonl and emits one record per heading', () => {
+  const root = gitFixture({ 'docs/product/p.md': '---\ntitle: P\nkind: product\nstatus: active\nupdated: 2026-08-27\n---\n\n# P\n\nBody.\n' })
+  try {
+    const records = cli(['export'], { cwd: root }).trim().split('\n').map((line) => JSON.parse(line))
+    assert.deepEqual(records.map((r) => r.heading), ['P'])
+    assert.equal(records[0].status, 'active')
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('context with an unknown flag exits 2 with usage', () => {
+  const root = gitFixture({ 'docs/product/p.md': '---\ntitle: P\nkind: product\nstatus: active\nupdated: 2026-08-27\n---\n\n# P\n' })
+  try {
+    const { status, stderr } = cliResult(['context', '--nope'], { cwd: root })
+    assert.equal(status, 2)
+    assert.match(stderr, /usage: ai-doc-system context/)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('context with a path that is not a document exits 2 and names it', () => {
+  const root = gitFixture({ 'docs/product/p.md': '---\ntitle: P\nkind: product\nstatus: active\nupdated: 2026-08-27\n---\n\n# P\n' })
+  try {
+    const { status, stderr } = cliResult(['context', 'docs/product/nope.md'], { cwd: root })
+    assert.equal(status, 2)
+    assert.match(stderr, /context: no document at docs\/product\/nope\.md/)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
