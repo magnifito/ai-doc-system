@@ -113,6 +113,29 @@ export function renderFrontmatter(data) {
   return `---\n${lines.join('\n')}\n---\n`
 }
 
+/**
+ * Replace or insert one top-level scalar line inside a raw frontmatter block,
+ * leaving every other byte alone. Re-rendering the whole block from parsed
+ * data is not an option: the parser flattens values it cannot represent (a
+ * nested map becomes a string), so a full re-render would corrupt them.
+ * `^key:` matches top level only — nested keys are indented.
+ *
+ * When the key is absent it is inserted after the FIRST anchor found, so pass
+ * anchors in decreasing FIELD_ORDER proximity — the field the new line should
+ * follow first, then the fallbacks. With no anchor present the line goes to the
+ * top of the block.
+ */
+export function patchScalar(raw, key, value, anchors) {
+  const line = `${key}: ${value}`
+  const existing = new RegExp(`^${key}:[^\\n]*$`, 'm')
+  if (existing.test(raw)) return raw.replace(existing, line)
+  for (const anchor of anchors) {
+    const anchorLine = raw.match(new RegExp(`^${anchor}:[^\\n]*$`, 'm'))
+    if (anchorLine) return raw.replace(anchorLine[0], `${anchorLine[0]}\n${line}`)
+  }
+  return `${line}\n${raw}`
+}
+
 /** The first `# ` heading, or null. Used to derive `title` during migration. */
 export function firstHeading(body) {
   const match = body.match(/^#\s+(.+)$/m)

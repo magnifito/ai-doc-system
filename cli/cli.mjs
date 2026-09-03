@@ -10,6 +10,8 @@ import { readFileSync } from 'node:fs'
 
 const COMMANDS = {
   init: ['init-docs.mjs', 'give this repo a gated docs tree'],
+  new: ['new-doc.mjs', 'write a gate-clean document at <path>'],
+  mv: ['mv-doc.mjs', 'git mv + restamp + regenerate (promotion)'],
   check: ['check-docs.mjs', 'run the blocking gate'],
   advisory: ['check-docs-advisory.mjs', 'non-blocking drift report'],
   gen: ['gen-docs-index.mjs', 'regenerate INDEX.md and index.json'],

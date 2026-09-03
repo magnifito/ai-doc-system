@@ -67,6 +67,16 @@ test('gen then check succeed in the invoking repository', () => {
   }
 })
 
+test('new writes a document the gate accepts, with no gen in between', () => {
+  const root = gitFixture({})
+  try {
+    assert.match(cli(['new', 'docs/product/invoices.md', '--title', 'Invoices'], { cwd: root }), /created/)
+    assert.match(cli(['check'], { cwd: root }), /check-docs: OK/)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
 test('advisory writes to GITHUB_STEP_SUMMARY when the variable is set', () => {
   const root = gitFixture({
     'docs/engineering/a.md':

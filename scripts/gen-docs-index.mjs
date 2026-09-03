@@ -226,30 +226,43 @@ export function renderIndex(root, config = loadConfig(root)) {
   return targets
 }
 
+/**
+ * Write every generated artefact. Exported so the writers (`new`, `mv`) can
+ * leave the tree gate-clean in one call rather than shelling out to this
+ * script. Returns the paths written.
+ */
+export function writeIndex(root, config = loadConfig(root)) {
+  const written = []
+  for (const [path, content] of renderIndex(root, config)) {
+    writeFileSync(join(root, path), content)
+    written.push(path)
+  }
+  return written
+}
+
 export function main() {
   const root = repoRoot()
   const config = loadConfig(root)
-  const targets = renderIndex(root, config)
   const check = process.argv.includes('--check')
 
+  if (!check) {
+    for (const path of writeIndex(root, config)) console.log(`wrote ${path}`)
+    process.exit(0)
+  }
+
   let stale = false
-  for (const [path, content] of targets) {
-    if (check) {
-      let current = null
-      try {
-        current = readFileSync(join(root, path), 'utf8')
-      } catch {
-        /* missing counts as stale */
-      }
-      // CRLF-tolerant for the same reason as the gate's assertion 4: a Windows
-      // checkout is not a stale index.
-      if (current?.replaceAll('\r\n', '\n') !== content) {
-        console.error(`stale: ${path} — run \`node scripts/gen-docs-index.mjs\``)
-        stale = true
-      }
-    } else {
-      writeFileSync(join(root, path), content)
-      console.log(`wrote ${path}`)
+  for (const [path, content] of renderIndex(root, config)) {
+    let current = null
+    try {
+      current = readFileSync(join(root, path), 'utf8')
+    } catch {
+      /* missing counts as stale */
+    }
+    // CRLF-tolerant for the same reason as the gate's assertion 4: a Windows
+    // checkout is not a stale index.
+    if (current?.replaceAll('\r\n', '\n') !== content) {
+      console.error(`stale: ${path} — run \`node scripts/gen-docs-index.mjs\``)
+      stale = true
     }
   }
   process.exit(stale ? 1 : 0)
