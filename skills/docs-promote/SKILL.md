@@ -16,6 +16,9 @@ Promote it first, then **rewrite the prose to describe this product**:
 ai-doc-system mv docs/reference/<name>.md docs/product/<name>.md
 ```
 
+Run these as `npx ai-doc-system …` (npm install) or `node scripts/<name>.mjs` (vendored); a bare
+`ai-doc-system` is on PATH only inside an npm script.
+
 `mv` is `git mv` plus a restamp: it sets `kind` and `module` for the destination, and sets `status`
 to the destination tier's forced status if it has one, else `--status`, else `draft` when leaving
 `reference`, else the status the document already had. `product/` forces nothing and no `--status`

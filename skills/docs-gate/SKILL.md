@@ -13,6 +13,9 @@ change a rule's severity to get a green run.
 ai-doc-system check --json     # the same list, one object per violation, for a long run
 ```
 
+Run these as `npx ai-doc-system …` (npm install) or `node scripts/<name>.mjs` (vendored); a bare
+`ai-doc-system` is on PATH only inside an npm script.
+
 Errors exit 1 and end `[rule]`; warnings print in full, exit 0 unless the project raised them, and
 end `[rule, warn]`. The cross-tree half of `link` — a tracked file outside the docs tree naming a
 dead path — has no line to point at, so its file reads `(repo)`; `--format github` carries the same

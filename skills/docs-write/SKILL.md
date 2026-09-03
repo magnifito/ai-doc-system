@@ -15,6 +15,9 @@ where most gate failures come from, so the file is created by a command, and the
 ai-doc-system new docs/<tier>/<name>.md --title "<Title>" --summary "<one line>"
 ```
 
+Run these as `npx ai-doc-system …` (npm install) or `node scripts/<name>.mjs` (vendored); a bare
+`ai-doc-system` is on PATH only inside an npm script.
+
 It derives `kind` from the path, takes the tier's forced status where the tier has one, else
 `--status`, else `draft`, stamps today's `updated`, and regenerates the index. Pick the tier by
 authority, not by topic:
@@ -35,7 +38,7 @@ The gate separately rejects two files sharing a basename in one tier.
 |---|---|---|
 | `summary` | Always. One sentence the index shows so an agent can choose without opening the file. | Non-empty, and one line. |
 | `evidence` | The document claims a current state (`shipped`, a runbook, a metrics page). A list of `path`, `path:line`, `path:line-line`, or a directory, or a command starting with an allowed runner (`npm test`, `node …`). | Every path exists case-exactly; a command's first word is in `evidenceRunners`. |
-| `code` | `status: shipped`, or any document that describes code. A list of paths the document is about. | Not checked by the gate. `shipped` without `code:` warns (`shipped-code`); `ai-doc-system advisory` warns when a `code:` path is gone (`code-pointer`). |
+| `code` | `status: shipped`, or any document that describes code. **One** path — the file or directory the document is about, not a list. | Not checked by the gate. `shipped` without `code:` warns (`shipped-code`); `ai-doc-system advisory` warns when a `code:` path is gone (`code-pointer`). |
 | `implements` | This document realises a plan or spec. One path. | Target exists; if the target's `updated` is later than this file's, `upstream` warns. |
 | `changes` | Only where the project's tiers declare a `state` kind: the state document this one alters. A list of paths. | Every path exists **and is kind `state`**. The default tiers produce no `state` kind — leave `changes` unset there. |
 | `source_url` | The document was captured from the web. `http(s)://`. | Shape only. A project can make it required on `reference`. |

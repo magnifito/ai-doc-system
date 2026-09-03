@@ -16,6 +16,9 @@ ai-doc-system check                    # warnings: shipped-code, upstream, revie
 ai-doc-system impact --base <ref>      # documents whose claims cover the paths a change touched
 ```
 
+Run these as `npx ai-doc-system …` (npm install) or `node scripts/<name>.mjs` (vendored); a bare
+`ai-doc-system` is on PATH only inside an npm script.
+
 `advisory` and `impact` never block; `check` blocks only on its errors — the four warnings named
 above print and exit 0 either way. `advisory`'s headline for each rule carries the id, with the
 documents it found indented below; `check`'s lines each carry their own id; `impact`'s lines carry

@@ -26,7 +26,7 @@ find docs -name '*.md' | wc -l                       # corpus size
 for d in docs/*/; do printf '%-40s %s\n' "${d%/}" \
   "$(git log -1 --format=%ad --date=short -- "$d")"; done   # per-tree staleness
 find docs -name '*.md' | grep -E '[ A-Z_&]'          # paths that break globbing
-grep -rl '^---$' --include='*.md' docs | wc -l       # files that already have frontmatter
+grep -rl '^---$' --include='*.md' docs | wc -l       # files with a `---` line (frontmatter or a rule — an upper bound)
 ```
 
 The staleness sweep is the highest-value command: a clean date split between two groups of
@@ -54,9 +54,12 @@ dependency: add `yaml` to the target's dependencies — without it every script 
 
 If the target's answers differ from the defaults, write `docs-system.config.json` at its root —
 `docsDir`, `tiers`, `statuses`, `tierStatus`, `exempt`, `tierOrder`, `indexSubdivide`,
-`referenceScanExclude`, `evidenceRunners`, and `rules` (per-rule severity: `error`, `warn` or
-`off`). Point `$schema` at `schema/docs-system.config.schema.json` for completion, and use a `key+`
-suffix to extend an array default instead of replacing it. A project whose answers **are** the
+`referenceScanExclude`, `evidenceRunners`, `sentinels`, `allowedBasenamePrefixes`,
+`requiredFields` (extra fields a kind demands), `vocabularies`, the module axis (`modules`,
+`moduleRoot`, `platformKey` — leave `modules` empty and every module assertion passes vacuously),
+and `rules` (per-rule severity: `error`, `warn` or `off`). Point `$schema` at
+`https://raw.githubusercontent.com/magnifito/ai-doc-system/main/schema/docs-system.config.schema.json`
+for completion, and use a `key+` suffix to extend an array default instead of replacing it. A project whose answers **are** the
 defaults ships no config file. Unknown keys are rejected, so a typo cannot silently do nothing.
 
 Settle naming before you migrate, not after. Kebab-case is the default; decide the sentinel set
@@ -65,22 +68,30 @@ worth declaring (`OPUS-`, `RFC-`), and put both in the config. The survey shows 
 the same stem in two casings. Renaming for case alone needs **two** `git mv`s through a temporary
 name on macOS and Windows.
 
-Wire up five scripts:
+Wire up the scripts. On the npm route these four are exactly what `init` writes (for a migration,
+where `init` does not run, add them by hand):
 
 ```jsonc
-"lint:docs":          "node scripts/check-docs.mjs",
-"lint:docs:advisory": "node scripts/check-docs-advisory.mjs",  // non-blocking
-"gen:docs-index":     "node scripts/gen-docs-index.mjs",
-"docs:impact":        "node scripts/impact-docs.mjs",          // non-blocking
-"test:scripts":       "node --test scripts/*.test.mjs"          // vendored route only
+"lint:docs":          "ai-doc-system check",
+"lint:docs:advisory": "ai-doc-system advisory",  // non-blocking
+"gen:docs-index":     "ai-doc-system gen",
+"docs:impact":        "ai-doc-system impact",    // non-blocking
 ```
+
+On the vendored route write the same four as `node scripts/check-docs.mjs`,
+`node scripts/check-docs-advisory.mjs`, `node scripts/gen-docs-index.mjs` and
+`node scripts/impact-docs.mjs`, plus a fifth: `"test:scripts": "node --test scripts/*.test.mjs"`.
+
+Run these as `npx ai-doc-system …` (npm install) or `node scripts/<name>.mjs` (vendored); a bare
+`ai-doc-system` is on PATH only inside an npm script.
 
 `lint:docs` goes in the blocking gate — cheap, so put it before the type checks. `lint:docs:advisory`
 goes wherever the project keeps non-blocking checks. On pull requests add two steps:
 `check --format github --base origin/<default>` is **blocking** (exit 1 on any error), annotates
 the offending file, and adds the two history-aware rules (`transition`, `promoted-verbatim`);
 `impact --base origin/<default>` lists the documents whose claims cover the changed paths into the
-job summary and always exits 0.
+job summary and always exits 0. Both need full history — set `fetch-depth: 0` on
+`actions/checkout`, or `check --base` exits 2 with `base ref … does not resolve`.
 
 ## 3. Migrate
 
@@ -105,7 +116,8 @@ Then, in this order:
    project's actual tiers.
 4. `node scripts/gen-docs-index.mjs`, then `node scripts/check-docs.mjs` until it prints OK. A
    violation you do not understand is docs-gate.
-5. **Delete `docs-migration.map.mjs` and `migrate-docs.mjs`** from the target. They ran once.
+5. **Delete `docs-migration.map.mjs`** (and, on the vendored route, `migrate-docs.mjs`) from the
+   target. They ran once.
 6. Add a section to the target's `AGENTS.md` / `CLAUDE.md`: *read `docs/index.json` first, never
    grep `docs/` blind*, plus the promotion rule.
 
