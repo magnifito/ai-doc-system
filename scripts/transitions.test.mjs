@@ -257,3 +257,17 @@ test('a status the project added to the vocabulary is never checked', () => {
     rmSync(root, { recursive: true, force: true })
   }
 })
+
+test('a same-tier rename is not a promotion and needs no rewrite', () => {
+  const doc = '---\ntitle: X\nkind: product\nstatus: active\nupdated: 2026-08-17\n---\n# X\n\nBody that nobody has to rewrite just because the file was renamed.\n'
+  const root = gitFixture({ 'docs/product/x.md': doc })
+  try {
+    regen(root)
+    commitAll(root)
+    execFileSync('git', ['mv', 'docs/product/x.md', 'docs/product/y.md'], { cwd: root, stdio: 'pipe' })
+    regen(root)
+    assert.deepEqual(promotionRules(checkDocs(root, undefined, { base: 'HEAD' })), [])
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})

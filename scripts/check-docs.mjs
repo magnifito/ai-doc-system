@@ -301,9 +301,15 @@ export function checkDocs(root, config = loadConfig(root), options = {}) {
     // and judging it would keep failing for ever after the branch merges.
     if (options.base && changed.has(path)) {
       // The origin this document came from: what it says (`promoted_from`),
-      // else what git saw (a rename), else itself.
+      // else what git saw (a rename), else itself. Rename detection pairs
+      // TRACKED entries only, so a plain `mv` that has not been staged is
+      // unpaired and the document is simply judged against its own path.
       const renamedOrigin = renames.get(path)
       const originPath = data.promoted_from ?? renamedOrigin ?? path
+      // Only a move that changed the document's AUTHORITY is a promotion. A
+      // same-tier rename changes a filename and nothing else — demanding a
+      // rewrite of prose that stayed true is noise.
+      const crossedTier = originPath !== path && kindForPath(config, originPath) !== kindForPath(config, path)
       const before = showAtRef(root, baseSha, originPath)
       if (data.promoted_from) {
         if (before === null) {
@@ -315,7 +321,7 @@ export function checkDocs(root, config = loadConfig(root), options = {}) {
         if (exists(data.promoted_from)) {
           add('promoted-verbatim', path, 'promoted_from', `names ${data.promoted_from}, which still exists — promotion is a move`)
         }
-      } else if (renamedOrigin && kindForPath(config, renamedOrigin) !== kindForPath(config, path)) {
+      } else if (renamedOrigin && crossedTier) {
         // Crossing a tier boundary IS promotion, whether or not the author
         // called it that: the document's authority changed and the trail of
         // where the prose came from has to survive the move.
@@ -332,7 +338,7 @@ export function checkDocs(root, config = loadConfig(root), options = {}) {
         }
         // Promotion without a rewrite is the failure the reference tier exists
         // to prevent: someone else's prose, wearing this product's authority.
-        if (originPath !== path && prior.body.trim() === body.trim()) {
+        if ((data.promoted_from || crossedTier) && prior.body.trim() === body.trim()) {
           add('promoted-verbatim', path, 'promoted_from', `body is identical to ${originPath} at ${options.base} — rewrite the prose to describe this product`)
         }
       }
