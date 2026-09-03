@@ -80,10 +80,12 @@ Wire up five scripts:
 `lint:docs:advisory` goes wherever the project keeps non-blocking checks. **Wire the tests too:** a
 suite no runner executes is green exactly once.
 
-On pull requests, add two non-blocking steps: `check --format github --base origin/<default>`
-annotates each violation on its line and adds the two history-aware rules (`transition`,
-`promoted-verbatim`), and `impact --base origin/<default>` lists the documents whose claims cover
-the changed paths, into the job summary. `impact` always exits 0 — it reports, it does not judge.
+On pull requests, add two more steps. `check --format github --base origin/<default>` is
+**blocking** — it exits 1 on any error, exactly as a plain `check` does — and it annotates the
+offending file (there are no line numbers yet) and adds the two history-aware rules (`transition`,
+`promoted-verbatim`). `impact --base origin/<default>` lists the documents whose claims cover the
+changed paths, into the job summary; `impact` is the one that always exits 0 — it reports, it does
+not judge.
 
 ## 3. Migrate
 
@@ -113,15 +115,19 @@ Then, in this order:
 
 ## 4. Rules that outlive the migration
 
-- **Nothing in `reference/` may be implemented directly.** Promote it first — `git mv` into
-  `product/`, restatus, and **rewrite the prose to describe this product**. Promoting a captured
-  document verbatim is how someone else's assumptions become your requirements.
+- **Nothing in `reference/` may be implemented directly.** Promote it first —
+  `ai-doc-system mv docs/reference/<name>.md docs/product/<name>.md`, then **rewrite the prose to
+  describe this product**. Promoting a captured document verbatim is how someone else's assumptions
+  become your requirements. (A bare `git mv` writes no `promoted_from` and fails
+  `promoted-verbatim` under `check --base`.)
 - **Add a document with `ai-doc-system new <path> --title … --summary …`.** It derives `kind` from
-  the path, takes the tier's status, stamps today, and regenerates the index — so the document
-  passes the gate on its first run. Hand-written frontmatter is where most gate failures come from.
-- **Move or promote with `ai-doc-system mv <from> <to>`** — it restamps and records
-  `promoted_from`; you still rewrite the prose. That field is what lets `check --base` tell a
-  promotion from a copy, and the prose rewrite is the half no command can do.
+  the path, takes the tier's forced status where the tier has one, else `--status`, else `draft`,
+  stamps today, and regenerates the index — so the document passes the gate on its first run.
+  Hand-written frontmatter is where most gate failures come from.
+- **Move or promote with `ai-doc-system mv <from> <to>`** — it restamps `kind`, `module`, `status`
+  and `updated` (to today: a promotion is a substantive change, and the prose rewrite is mandatory),
+  and records `promoted_from`; you still rewrite the prose. That field is what lets `check --base`
+  tell a promotion from a copy, and the prose rewrite is the half no command can do.
 - **`kind` and `module` are derived from the path AND stored, and the gate asserts they agree.**
   Moving a file between tiers changes what the path implies; after a move made by hand, run
   `ai-doc-system fix` to restamp both fields. (The migration stamps them itself.)

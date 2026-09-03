@@ -21,7 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `promoted_from` (the document a promotion came from).
 - Commands `new`, `mv`, `impact`, `verify`, `context` and `export`. `new` writes a
   gate-clean document (`--title`, `--summary`, `--status`); `mv` does git mv plus
-  restamp plus regenerate (`--status`); `impact` lists the documents whose claims
+  restamp plus regenerate (`--status`), and restamps `updated` to today — a promotion
+  is a substantive change and the prose rewrite that follows it is mandatory; `impact` lists the documents whose claims
   cover the changed paths (`--base`, `--json`); `verify` runs command evidence and
   hashes path evidence (`--only`, `--stamp`); `context` prints selected documents
   behind an authority banner within a budget (`--kind`, `--status`, `--module`,
@@ -51,6 +52,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Upgrade step: run `ai-doc-system gen` once after upgrading — `index.json` gains `by_code`
+  and `INDEX.md` a Summary column, and the `index` rule compares bytes.
 - `docs/INDEX.md` gains a Summary column.
 - The advisory pass reads the history in one git walk instead of one per document.
 - `docs-system.config.json` may use `+` keys; setting both `key` and `key+` is an

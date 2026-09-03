@@ -7,7 +7,7 @@ CI on every push.
 humans. Both are generated — run `node scripts/gen-docs-index.mjs` after adding or moving a
 document; never hand-edit them.
 
-Two tiers are populated:
+The populated tiers:
 
 | Tier | What it holds |
 |---|---|

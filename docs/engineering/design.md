@@ -210,8 +210,8 @@ project can group by something else first — `modules/*/state/` — and still d
 tier segment inside it.
 
 It appears in `index.json`, and in frontmatter, and the gate rejects a document where the two
-disagree. Moving a file between tiers changes its kind; run `fix-docs-frontmatter.mjs` afterwards to
-restamp the field.
+disagree. Moving a file between tiers changes its kind; `ai-doc-system mv` moves and restamps in one
+step, and `ai-doc-system fix` restamps a move already made by hand.
 
 ### 4.2a `module` — the optional second axis
 
@@ -256,10 +256,10 @@ Status and tier are tied where only one value is honest: everything under `refer
 `status: reference` (and `reference` is legal nowhere else — promotion means leaving the tier), and
 everything under `archive/` must be `status: superseded`. The gate enforces both directions.
 
-One softness, stated rather than hidden: the gate does **not** require `code:` on `shipped` — the
-table's "`code:` points at the implementation" is the convention, not an assertion. Enforcing it
-belongs to the advisory pass (§5.3), because a blocking rule here would just invite placeholder
-paths.
+One softness, stated rather than hidden: `shipped` without a `code:` does not BLOCK. The gate does
+report it, as the `shipped-code` rule at `warn` (§5.2) — it is not left to the advisory pass — but a
+warning never decides the exit code. Making it an error would just invite placeholder paths, and a
+project that wants it enforced sets `{"rules": {"shipped-code": "error"}}`.
 
 ### 4.4 Applying metadata to an existing tree
 
@@ -302,6 +302,9 @@ git at index time would stale the index on every commit that touches a doc, and 
 frontmatter-versus-git drift would punish typo fixes. So the contract is honest and small: `updated`
 means "last substantive change, per the author", and the advisory pass reports drift without blocking
 anything.
+
+One command sets it: `ai-doc-system mv` restamps `updated` to today, because a promotion IS a
+substantive change — the prose rewrite that must follow it is mandatory.
 
 ---
 
@@ -360,7 +363,8 @@ In detail:
 1. **Frontmatter present and parseable** on every `.md` under the docs tree, except the exempt files.
 2. **Closed vocabularies.** `status` is a member of its closed set; `title` and `updated` are present;
    `kind` (and `module`, when modules are declared) is present and agrees with what the path implies
-   (§4.1's reversal note); dates are ISO-formatted; status agrees with the tier in both directions
+   (ADR 0001, `adr/0001-store-kind-in-frontmatter.md`); dates are ISO-formatted; status agrees with
+   the tier in both directions
    (§4.3); an `implements:` field, when present, names a file that exists. Per-kind required fields
    and the `evidence`/`changes` value checks are §4.2a.
 3. **Path hygiene, and naming.** Two rules that are easy to confuse, and the second one is the one
@@ -427,7 +431,7 @@ fetched, and silently dropping these two would report a green gate that checked 
   is also the easy one.
 
 **Four rules warn rather than block.** `shipped-code` wants `code:` on a shipped document (§4.3
-explains why it is not an error); `upstream` catches a document whose `implements` target moved on
+explains why the gate reports it without blocking); `upstream` catches a document whose `implements` target moved on
 without it; `review` catches a `review_by` date that has passed; `evidence-lock` catches evidence
 that changed under a claim since `verify` hashed it (§5.7). None of them is a reason to refuse a
 commit — each is a thing to go and fix — and a project that disagrees promotes it in `rules`.
@@ -453,9 +457,11 @@ warning and an error here.
 
 ### 5.4 Failure behaviour
 
-One line per violation, formatted `docs/path.md:field — <expected>`, then exit 1. Output is capped at
-100 lines plus a total (`--all` prints everything) so a mass failure cannot flood the log. No autofix
-inside the gate; regenerating the index is a separate, explicitly invoked command.
+One line per violation, formatted `docs/path.md:field — <expected>`, then exit 1. The 100-line cap
+(plus a total; `--all` prints everything) applies to ERRORS only — warnings are advisory and always
+print in full, and `--json` and `--format github` are uncapped, because a consumer parsing the whole
+report must not be handed a truncated one. No autofix inside the gate; regenerating the index is a
+separate, explicitly invoked command.
 
 ### 5.5 Tests
 
@@ -519,9 +525,13 @@ tests of a pull request — because that is what it is.
 
 > Never grep `docs/` blind. Read `docs/index.json` first and filter by `kind` and `status`.
 
-`index.json` is a flat array of objects — `path`, `title`, `kind`, `status`, `updated`, and where
-present `implements` and `code`. At well under 100 KB for a few hundred documents it is cheap to read
-in full.
+`index.json` is `{ generated, count, docs, by_code }`. `docs` is the array of entries, each with
+`path`, `title`, `kind`, `status` and `updated` always, plus — only where the document has them —
+`summary`, `module`, `review_by`, `verified_on`, `evidence`, `commitment`, `changes`, `implements`,
+`code`, `source_url` and `superseded_by`. `by_code` is the reverse map: a repository path (a `code:`
+value, or a path-form `evidence:` entry, with any `#fragment`, `:line` suffix or trailing slash
+stripped) to the sorted list of documents that claim it. At well under 100 KB for a few hundred
+documents it is cheap to read in full.
 
 The concrete win: an agent asked "is feature X built?" performs one file read, finds `kind: reference`
 with no `code:` field, and answers correctly. Before, the same question produced a grep across
@@ -587,7 +597,8 @@ AUTHORITY: captured from elsewhere — NOT a commitment, never a build spec.
 
 The `AUTHORITY` line is the whole point: it says what the status entitles a reader to *do* with the
 document, in a sentence that survives a copy-paste. `--max-chars N` keeps a pack inside a context
-budget, dropping whole documents rather than truncating one mid-sentence.
+budget, dropping whole documents rather than truncating one mid-sentence — and the first document is
+always emitted whole, however large, because a pack with nothing in it answers no question.
 
 `ai-doc-system export` is the same selection as JSONL, **one record per heading section**, with the
 frontmatter repeated on every record. A chunker that splits a document into twenty pieces would

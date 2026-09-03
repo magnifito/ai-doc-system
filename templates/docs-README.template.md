@@ -19,8 +19,10 @@ them.
 | `archive/` | `archive` | Replaced. Everything here is `status: superseded` and names its replacement. |
 
 `kind` is **derived from the path and also stored in frontmatter**; the gate rejects a document
-where the two disagree. Moving a file between tiers changes what the path implies — `git mv`, then
-`node scripts/fix-docs-frontmatter.mjs` to restamp the stored copy.
+where the two disagree. Moving a file between tiers changes what the path implies — use
+`ai-doc-system mv <from> <to>`, which moves, restamps `kind`/`module`/`status` and `updated`, and
+records `promoted_from`. (`ai-doc-system fix` restamps a move already made by hand; a bare `git mv`
+writes no `promoted_from` and fails `promoted-verbatim` under `check --base`.)
 
 ## Frontmatter
 
@@ -57,8 +59,9 @@ reference/   →   product/    →   plans/   →   plans/done/
 (inspiration)   (committed)     (active)      (shipped)
 ```
 
-1. `git mv docs/reference/<area>/<feature>/PRD.md docs/product/<feature>.md`
-2. Change `status: reference` to `draft`; add `implements: docs/product/ROADMAP.md#<phase>`.
+1. `ai-doc-system mv docs/reference/<area>/<feature>/PRD.md docs/product/<feature>.md` — the move,
+   the restamp of `kind`/`status`/`updated`, and `promoted_from`, in one command.
+2. Add `implements: docs/product/ROADMAP.md#<phase>`.
 3. **Rewrite the prose to describe this product, not the source it was captured from.** Mandatory —
    promoting a reference document verbatim is how someone else's assumptions become your
    requirements.
@@ -69,11 +72,12 @@ reference/   →   product/    →   plans/   →   plans/done/
 
 The `lint:docs` script (`scripts/check-docs.mjs`) is a blocking step of this project's quality
 gate. It asserts frontmatter is present and valid, that `kind` agrees with the path, that status
-agrees with the tier, that paths are kebab-case (or ALL-CAPS basenames), that no two documents in
+agrees with the tier, that paths are kebab-case — an ALL-CAPS basename is legal only for a declared
+sentinel (`README`, `INDEX`, `STATUS`, `ROADMAP`, …) or a declared programme prefix — that no two documents in
 one tier share a basename, that the generated index is fresh, that no Markdown link to a `.md` file
 is dead — inside `docs/` and from every tracked file outside it — and that `superseded` names a
-live replacement. The `test:scripts` script runs its tests. Advisory-only drift reports (`code:`
-pointers, `updated:` versus git) live in `check-docs-advisory.mjs`.
+live replacement. Advisory-only drift reports (`code:` pointers, `updated:` versus git) live in
+`check-docs-advisory.mjs`.
 
 The system this tree implements is `ai-doc-system` — design and rationale in that repository's
 `docs/engineering/design.md`.

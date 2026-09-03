@@ -27,11 +27,11 @@ into an explicitly non-binding idea bank, and it is checkable by machine.
 |---|---|
 | `check` | The gate. Every violation carries a rule id and a severity; errors exit 1, warnings never do. Wire it in as `lint:docs`. |
 | `gen` | Generates `docs/INDEX.md` (humans) and `docs/index.json` (agents, with the `by_code` reverse map). |
-| `new <path>` | Writes a document that passes the gate on its first run — `kind` from the path, the tier's status, today's date — and regenerates the index. |
-| `mv <from> <to>` | The mechanical half of a promotion: `git mv`, restamp `kind`/`module`/`status`, record `promoted_from`, regenerate. The prose rewrite stays yours. |
+| `new <path>` | Writes a document that passes the gate on its first run — `kind` from the path, the tier's forced status where the tier has one, else `--status`, else `draft`, today's date — and regenerates the index. |
+| `mv <from> <to>` | The mechanical half of a promotion: `git mv`, restamp `kind`/`module`/`status`, restamp `updated` to today, record `promoted_from`, regenerate. The prose rewrite stays yours. |
 | `verify` | Runs command-form `evidence`, hashes path-form evidence into `docs/evidence-lock.json`, and with `--stamp` sets `verified_on`. Explicit invocation only — see below. |
 | `impact` | The reverse question: which documents claim the paths this change touched. Advisory, exits 0, writes to the GitHub step summary. |
-| `context` / `export` | Documents with an `AUTHORITY:` banner inside a character budget, and the same selection as JSONL (one record per heading) for RAG stores. |
+| `context` / `export` | Documents with an `AUTHORITY:` banner inside a budget — whole documents are dropped, never truncated, and the first document is always emitted whole — and the same selection as JSONL (one record per heading) for RAG stores. |
 | `advisory` | Non-blocking: dead `code:` pointers, `updated:`-versus-git drift, `state` docs whose code moved after `verified_on`. |
 | `fix` | Restamps `kind` and `module` across the tree after a move. |
 | `migrate` | One-shot: `git mv` into the tiers, stamp frontmatter, rewrite every tracked reference. Deleted after it runs. |
@@ -59,7 +59,7 @@ docs/
   reference/     # captured from elsewhere. NEVER a build spec.      status: reference
   product/       # committed scope
   engineering/   # how this repository works        (+ adr/, runbooks/)
-  plans/         # work in flight                   (+ done/)
+  plans/         # work in flight
   archive/       # replaced                                          status: superseded
 ```
 
@@ -136,7 +136,7 @@ and never change the exit code, so a rule can be adopted before it is enforced.
 | `implements` | error | `implements` names a file that does not exist |
 | `superseded` | error | `status: superseded` with no `superseded_by`, or one pointing at nothing |
 | `evidence` | error | an `evidence` entry is neither a live path nor a command starting with a known runner |
-| `changes` | error | a `changes` entry is missing or is not a `state` document |
+| `changes` | error | a `changes` entry names something that does not exist, or names a document that is not `kind: state`. A missing `changes` field is `required`, not this |
 | `source-url` | error | `source_url` is not an `http(s)` URL |
 | `summary` | error | `summary` is present but empty, or spans more than one line |
 | `index` | error | `INDEX.md` or `index.json` differs from what the generator would write |
@@ -171,7 +171,7 @@ npx ai-doc-system mv docs/<tier>/<name>.md docs/<other-tier>/<name>.md   # promo
 npx ai-doc-system gen                   # regenerate INDEX.md and index.json
 npx ai-doc-system check                 # the blocking gate
 npx ai-doc-system check --json          # the same verdict as machine-readable JSON
-npx ai-doc-system check --all           # print every violation, not the first 100
+npx ai-doc-system check --all           # print every error, not the first 100 (warnings always print in full)
 npx ai-doc-system check --base origin/main    # + the history-aware rules, over what this branch changed
 npx ai-doc-system verify --only docs/<tier>/<name>.md --stamp   # run the evidence, then stamp verified_on
 npx ai-doc-system impact --base origin/main   # which documents claim the changed paths
@@ -181,13 +181,17 @@ npx ai-doc-system advisory              # non-blocking drift report
 npx ai-doc-system fix                   # restamp kind/module after moves
 ```
 
+**Upgrade step:** run `ai-doc-system gen` once after upgrading — `index.json` gains `by_code` and
+`INDEX.md` a Summary column, and the `index` rule compares bytes.
+
 `check --base <ref>` resolves the merge base of `<ref>` and `HEAD`, judges only the documents the
 branch changed since then (uncommitted work included), and adds the two rules that need history —
 `transition` and `promoted-verbatim`. A ref that does not resolve exits 2 rather than quietly
 checking less than it says, so on a shallow CI checkout fetch it first.
 
-In CI, `--format github` turns each violation into an annotation on the offending line, and
-`impact` posts the documents a pull request may have falsified into the job summary:
+In CI, `--format github` turns each violation into an annotation on the offending file (there are no
+line numbers yet), and `impact` posts the documents a pull request may have falsified into the job
+summary:
 
 ```yaml
 - run: npx ai-doc-system check --format github --base origin/${{ github.base_ref || 'main' }}
@@ -196,9 +200,10 @@ In CI, `--format github` turns each violation into an annotation on the offendin
 
 **`verify` is the only command that executes anything written in a document.** Command-form
 `evidence` entries are run through the shell; that never happens from `check`, from CI, or from the
-hooks — an author invokes it deliberately. Path-form entries are hashed into
-`docs/evidence-lock.json` instead, which is what lets the gate warn (`evidence-lock`) when the
-evidence under a claim moved.
+hooks — an author invokes it deliberately. **Never run `verify` on a branch you have not read:** an
+`evidence:` line is a command a document's author chose, and running it is running their code.
+Path-form entries are hashed into `docs/evidence-lock.json` instead, which is what lets the gate
+warn (`evidence-lock`) when the evidence under a claim moved.
 
 Configuration is optional. When there is a `docs-system.config.json`, point its `$schema` at the
 published schema for editor completion, and use a `key+` suffix to *extend* an array default rather

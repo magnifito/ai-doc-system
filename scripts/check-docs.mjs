@@ -377,8 +377,9 @@ export function checkDocs(root, config = loadConfig(root), options = {}) {
     }
 
     // shipped-code: the convention is that a shipped document points at its
-    // implementation. A warning, not an error — a blocking rule invites
-    // placeholder paths (design section 4.3).
+    // implementation. The GATE reports it, at `warn` — the advisory pass has no
+    // part in it — because a blocking rule here would invite placeholder paths
+    // (design sections 4.3 and 5.2).
     if (data.status === 'shipped' && !data.code) add('shipped-code', path, 'code', 'status is `shipped` but no `code:` names the implementation')
 
     // 5a. dead links inside the doc body — relative, or root-relative `<docsDir>/...`

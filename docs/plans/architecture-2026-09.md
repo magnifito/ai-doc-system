@@ -33,7 +33,7 @@ implements: docs/plans/debt.md
 
 | File | Responsibility |
 |---|---|
-| `scripts/check-docs.mjs` | The gate. Gains rule ids, severity filtering, `--base`, `--json`, `--format github`, `--rules`. |
+| `scripts/check-docs.mjs` | The gate. Gains rule ids, severity filtering, `--base`, `--json`, `--format github`. |
 | `scripts/docs-config.mjs` | Config. Gains `rules`, `evidenceRunners`, `+` array extension, `RULES` default map. |
 | `scripts/docs-frontmatter.mjs` | Gains `summary`, `source_url`, `review_by`, `promoted_from` in `FIELD_ORDER`; exports `patchScalar`. |
 | `scripts/docs-fs.mjs` | Gains `lastCommitDates(root)` (one git walk), `changedPaths(root, base)`, `showAtRef(root, ref, path)`. |
