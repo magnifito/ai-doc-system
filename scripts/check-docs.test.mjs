@@ -678,10 +678,31 @@ test('14a. index.json carries a by_code reverse map over code: and evidence path
     'src/b/index.ts': 'x',
     'docs/product/a.md': doc({ title: 'A', kind: 'product', status: 'shipped', updated: '2026-08-17', code: 'src/a.ts' }),
     'docs/product/b.md': doc({ title: 'B', kind: 'product', status: 'shipped', updated: '2026-08-17', code: 'src/b/' }),
+    // One document claiming both paths through evidence rather than `code:`,
+    // in all three forms: a `:line` suffix, a command, a trailing slash.
+    'docs/product/e.md': doc({
+      title: 'E', kind: 'product', status: 'shipped', updated: '2026-08-17',
+      evidence: ['src/a.ts:12', 'npm test', 'src/b/'],
+    }),
   })
   try {
     const json = JSON.parse(readFileSync(join(root, 'docs/index.json'), 'utf8'))
-    assert.deepEqual(json.by_code, { 'src/a.ts': ['docs/product/a.md'], 'src/b': ['docs/product/b.md'] })
+    assert.deepEqual(json.by_code, {
+      'src/a.ts': ['docs/product/a.md', 'docs/product/e.md'],
+      'src/b': ['docs/product/b.md', 'docs/product/e.md'],
+    })
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('14b. an evidence list of maps yields no by_code key, and no crash', () => {
+  const root = fixture({
+    'docs/product/m.md': '---\ntitle: M\nkind: product\nstatus: shipped\nupdated: 2026-08-17\nevidence:\n  - a: b\n---\n# M\n',
+  })
+  try {
+    const json = JSON.parse(readFileSync(join(root, 'docs/index.json'), 'utf8'))
+    assert.deepEqual(json.by_code, {})
   } finally {
     rmSync(root, { recursive: true, force: true })
   }

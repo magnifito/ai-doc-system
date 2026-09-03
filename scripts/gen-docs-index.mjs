@@ -12,7 +12,7 @@
  */
 import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { parseFrontmatter } from './docs-frontmatter.mjs'
+import { EVIDENCE_PATH, parseFrontmatter } from './docs-frontmatter.mjs'
 import { DEFAULTS, loadConfig, withDerived } from './docs-config.mjs'
 import { isExempt, kindForPath, moduleForPath } from './docs-taxonomy.mjs'
 import { listDocs, repoRoot } from './docs-fs.mjs'
@@ -48,6 +48,7 @@ export function buildIndex(root, config = loadConfig(root)) {
       // Carried so the reverse index can point back from a path an evidence
       // entry names. Only ever a list here; a malformed value is the gate's
       // business, and the index must not carry a shape the renderers cannot.
+      // `parseFrontmatter` has already coerced every member to a string.
       ...(Array.isArray(data.evidence) && data.evidence.length > 0 ? { evidence: data.evidence } : {}),
       ...(str(data, 'commitment') ? { commitment: data.commitment } : {}),
       ...(Array.isArray(data.changes) && data.changes.length > 0 ? { changes: data.changes } : {}),
@@ -85,13 +86,16 @@ export function buildByCode(entries, config = withDerived(DEFAULTS)) {
   for (const entry of entries) {
     if (entry.code) put(codeKey(entry.code), entry.path)
     for (const item of entry.evidence ?? []) {
-      // A malformed list member is the gate's violation to report, not a crash
-      // to raise here: the gate regenerates this index before it can report it.
-      if (typeof item !== 'string') continue
+      const value = item.trim()
       // Command-form evidence (`npm test`) names no path to point back from.
-      const first = item.trim().split(/\s+/)[0]
-      if (config.evidenceRunners.includes(first)) continue
-      put(codeKey(item.trim()), entry.path)
+      if (config.evidenceRunners.includes(value.split(/\s+/)[0])) continue
+      // Neither a command nor a path is a violation the GATE reports. It must
+      // not become a key here: `parseFrontmatter` coerces every list member to
+      // a string, so an `evidence:` list of maps would otherwise index the
+      // document under the literal "[object Object]".
+      const match = value.match(EVIDENCE_PATH)
+      if (!match) continue
+      put(codeKey(match[1]), entry.path)
     }
   }
   return Object.fromEntries(

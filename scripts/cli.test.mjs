@@ -243,3 +243,18 @@ test('impact names the documents claiming the code that changed', () => {
     rmSync(root, { recursive: true, force: true })
   }
 })
+
+test('impact with an unresolvable --base says so on stderr and still exits 0', () => {
+  const root = committedGitFixture({
+    'src/a.ts': 'x',
+    'docs/product/a.md':
+      '---\ntitle: A\nkind: product\nstatus: shipped\nupdated: 2026-08-27\ncode: src/a.ts\n---\n\n# A\n',
+  })
+  try {
+    const { status, stderr } = cliResult(['impact', '--base', 'nope'], { cwd: root })
+    assert.equal(status, 0)
+    assert.match(stderr, /docs impact: base ref "nope" does not resolve/)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})

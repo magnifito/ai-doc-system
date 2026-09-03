@@ -88,12 +88,16 @@ export function lastCommitDate(root, path) {
 /**
  * Repo-relative paths that changed.
  *
- * With `base`, everything that differs from the point the branch left `base` —
- * the merge base, so commits landed on `base` since the fork are not reported
- * as this branch's work — down to the working tree, so a local run sees edits
- * that are not committed yet. Without `base`, the working tree plus the index,
- * untracked files included; a repository with no commits at all falls back to
- * the index alone, because there is no `HEAD` to diff against.
+ * With `base`, the diff from the merge base of `base` and `HEAD` to the working
+ * tree, TRACKED FILES ONLY — the merge base so commits landed on `base` since
+ * the fork are not reported as this branch's work, the working tree so a local
+ * run sees edits that are not committed yet. A `base` that does not resolve
+ * throws: on a shallow CI checkout `origin/main` often is not fetched, and
+ * silently reporting "nothing changed" is the one answer a reader must not get.
+ *
+ * Without `base`, the working tree plus the index, untracked files included; a
+ * repository with no commits at all falls back to the index and the untracked
+ * files alone, because there is no `HEAD` to diff against.
  *
  * `core.quotePath=false` for the same reason as `lastCommitDates`: the default
  * C-quotes a non-ASCII path, which would then match no claim.
@@ -109,6 +113,11 @@ export function changedPaths(root, base) {
       .filter(Boolean)
   const untracked = () => git(['ls-files', '--others', '--exclude-standard'])
   if (base) {
+    try {
+      git(['rev-parse', '--verify', '--quiet', base])
+    } catch {
+      throw new Error(`base ref "${base}" does not resolve — fetch it or omit --base`)
+    }
     let from = base
     try {
       from = git(['merge-base', base, 'HEAD'])[0] ?? base

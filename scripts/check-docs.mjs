@@ -31,7 +31,7 @@ import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join, dirname, resolve, relative } from 'node:path'
 import { runDirect } from './docs-run.mjs'
-import { LIST_FIELDS, SCALAR_FIELDS, parseFrontmatter } from './docs-frontmatter.mjs'
+import { EVIDENCE_PATH, LIST_FIELDS, SCALAR_FIELDS, parseFrontmatter } from './docs-frontmatter.mjs'
 import { loadConfig } from './docs-config.mjs'
 import { isIsoDate } from './docs-dates.mjs'
 import { isExempt, kindForPath, moduleForPath, pathHygieneErrors, reservedStatuses, statusForKind } from './docs-taxonomy.mjs'
@@ -45,11 +45,6 @@ import { renderIndex } from './gen-docs-index.mjs'
  * exist, or a command a reader can re-run. Free prose is rejected — "we checked
  * and it works" is exactly the claim that went stale unnoticed for six months.
  */
-// Square brackets and parentheses are ordinary path characters in a Next.js
-// tree — `app/api/booking/[calendarSlug]/route.ts`, `app/[locale]/(public)/…` —
-// so a validator that rejects them rejects real evidence.
-const EVIDENCE_PATH = /^([A-Za-z0-9._\-/[\]()@]+)(?::\d+(?:-\d+)?)?$/
-
 function evidenceError(entry, exists, runners) {
   const first = entry.trim().split(/\s+/)[0]
   if (runners.includes(first)) return null

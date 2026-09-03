@@ -74,6 +74,20 @@ export const FIELD_ORDER = [
 ]
 
 /** Fields rendered as a block sequence rather than a scalar. */
+/**
+ * The path form an `evidence` entry may take: a repository path, optionally
+ * suffixed `:line` or `:line-line`. Capture group 1 is the path alone.
+ *
+ * Square brackets and parentheses are ordinary path characters in a Next.js
+ * tree — `app/api/booking/[calendarSlug]/route.ts`, `app/[locale]/(public)/…` —
+ * so a validator that rejects them rejects real evidence.
+ *
+ * Shared: the gate rejects an entry that is neither this nor a command, and the
+ * reverse index keys only on entries that match, so the two cannot drift into
+ * disagreeing about what an evidence path is.
+ */
+export const EVIDENCE_PATH = /^([A-Za-z0-9._\-/[\]()@]+)(?::\d+(?:-\d+)?)?$/
+
 export const LIST_FIELDS = new Set(['evidence', 'changes'])
 
 /**

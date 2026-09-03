@@ -34,6 +34,17 @@ function gitFixture(files) {
   return root
 }
 
+/** The same, left uncommitted — a repository with no `HEAD` at all. */
+function bareGitFixture(files) {
+  const root = mkdtempSync(join(tmpdir(), 'docs-impact-'))
+  for (const [path, content] of Object.entries(files)) {
+    mkdirSync(join(root, dirname(path)), { recursive: true })
+    writeFileSync(join(root, path), content)
+  }
+  execFileSync('git', ['init', '-q'], { cwd: root, stdio: 'pipe' })
+  return root
+}
+
 test('impactedDocs names every document whose code: or evidence covers a changed path', () => {
   const root = gitFixture({
     'src/a.ts': 'x',
@@ -61,6 +72,29 @@ test('changedPaths lists the working tree and staged changes when no base is giv
     writeFileSync(join(root, 'src/new.ts'), 'z')
     assert.deepEqual(changedPaths(root).sort(), ['src/a.ts', 'src/new.ts'])
     assert.deepEqual(changedPaths(root, 'HEAD'), ['src/a.ts'])
+  } finally {
+    clearConfigCache()
+    rmSync(root, { recursive: true, force: true })
+  }
+
+  // A repository with no commits has no `HEAD` to diff against, so the index
+  // and the untracked files are the whole answer rather than a crash.
+  const fresh = bareGitFixture({ 'src/staged.ts': 'x', 'src/loose.ts': 'y' })
+  try {
+    execFileSync('git', ['add', 'src/staged.ts'], { cwd: fresh, stdio: 'pipe' })
+    assert.deepEqual(changedPaths(fresh).sort(), ['src/loose.ts', 'src/staged.ts'])
+  } finally {
+    rmSync(fresh, { recursive: true, force: true })
+  }
+})
+
+test('changedPaths rejects a base ref that does not resolve, with one line a reader can act on', () => {
+  const root = gitFixture({ 'src/a.ts': 'x' })
+  try {
+    assert.throws(
+      () => changedPaths(root, 'nope'),
+      /^Error: base ref "nope" does not resolve — fetch it or omit --base$/,
+    )
   } finally {
     clearConfigCache()
     rmSync(root, { recursive: true, force: true })

@@ -7,7 +7,9 @@
  * have falsified.
  *
  * Usage:  node scripts/impact-docs.mjs [--base <ref>] [--json]
- *   --base <ref>  compare against <ref> instead of the working tree
+ *   --base <ref>  diff from the merge base of <ref> and HEAD to the working
+ *                 tree (tracked files only); default is the working tree and
+ *                 the index against HEAD, untracked files included
  *   --json        print `{ changed, hits }` instead of the text report
  */
 import { appendFileSync } from 'node:fs'
@@ -56,7 +58,15 @@ function flagValue(name) {
 
 export function main() {
   const root = repoRoot()
-  const changed = changedPaths(root, flagValue('--base'))
+  let changed
+  try {
+    changed = changedPaths(root, flagValue('--base'))
+  } catch (error) {
+    // An unresolvable `--base` is a checkout problem, not a docs problem. This
+    // pass is advisory: say what went wrong and get out of the build's way.
+    console.error(`docs impact: ${error.message}`)
+    process.exit(0)
+  }
   const hits = impactedDocs(root, changed)
   const lines = []
   if (hits.length === 0) {
