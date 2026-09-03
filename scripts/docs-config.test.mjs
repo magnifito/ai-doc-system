@@ -10,7 +10,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import test from 'node:test'
-import { CONFIG_FILE, DEFAULTS, loadConfig, withDerived } from './docs-config.mjs'
+import { CONFIG_FILE, DEFAULTS, clearConfigCache, loadConfig, withDerived } from './docs-config.mjs'
 import { kindForPath, isExempt } from './docs-taxonomy.mjs'
 import { checkDocs } from './check-docs.mjs'
 import { buildIndex, renderIndex } from './gen-docs-index.mjs'
@@ -193,4 +193,32 @@ test('a module requiring a key that is not registered is rejected', () => {
 test('requiredFields naming a kind that no tier produces is rejected', () => {
   const root = fixture({}, { requiredFields: { nonesuch: ['x'] } })
   assert.throws(() => loadConfig(root), /requiredFields names kind "nonesuch"/)
+})
+
+
+test('rules: defaults carry every known id at its default severity', () => {
+  const config = withDerived(DEFAULTS)
+  assert.equal(config.rules.link, 'error')
+  assert.equal(config.rules['shipped-code'], 'warn')
+})
+
+test('rules: an override changes one severity and keeps the rest', () => {
+  const root = mkdtempSync(join(tmpdir(), 'docs-config-'))
+  writeFileSync(join(root, 'docs-system.config.json'), JSON.stringify({ rules: { basename: 'warn' } }))
+  clearConfigCache()
+  const config = loadConfig(root)
+  assert.equal(config.rules.basename, 'warn')
+  assert.equal(config.rules.link, 'error')
+  rmSync(root, { recursive: true, force: true })
+})
+
+test('rules: an unknown id or severity is rejected', () => {
+  const root = mkdtempSync(join(tmpdir(), 'docs-config-'))
+  writeFileSync(join(root, 'docs-system.config.json'), JSON.stringify({ rules: { bogus: 'error' } }))
+  clearConfigCache()
+  assert.throws(() => loadConfig(root), /unknown rule "bogus"/)
+  writeFileSync(join(root, 'docs-system.config.json'), JSON.stringify({ rules: { link: 'loud' } }))
+  clearConfigCache()
+  assert.throws(() => loadConfig(root), /severity "loud"/)
+  rmSync(root, { recursive: true, force: true })
 })

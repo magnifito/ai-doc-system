@@ -18,7 +18,7 @@ import { dirname, join } from 'node:path'
 import test from 'node:test'
 import { checkDocs } from './check-docs.mjs'
 import { buildIndex, renderMarkdown, renderIndex } from './gen-docs-index.mjs'
-import { DEFAULTS, clearConfigCache, loadConfig, withDerived } from './docs-config.mjs'
+import { DEFAULTS, RULES, clearConfigCache, loadConfig, withDerived } from './docs-config.mjs'
 
 
 /**
@@ -47,7 +47,12 @@ function fixture(files, { withIndex = true, config } = {}) {
 function run(files, options) {
   const root = fixture(files, options)
   try {
-    return checkDocs(root)
+    return checkDocs(
+      root,
+      options?.config
+        ? withDerived({ ...DEFAULTS, ...options.config, rules: { ...RULES, ...(options.config.rules ?? {}) } })
+        : undefined,
+    )
   } finally {
     rmSync(root, { recursive: true, force: true })
   }
@@ -529,4 +534,26 @@ test('8j. evidence may name a path with Next.js dynamic segments', () => {
     'docs/modules/crm/state/[id]/(group)/pipelines.md': STATE_DOC,
   })
   assert.deepEqual(violations.filter((v) => v.field === 'evidence'), [])
+})
+
+
+test('11a. every violation carries a rule id and a severity', () => {
+  const violations = run({ 'docs/engineering/x.md': '# No frontmatter\n' })
+  assert.ok(violations.length > 0)
+  for (const v of violations) {
+    assert.equal(typeof v.rule, 'string')
+    assert.ok(['error', 'warn'].includes(v.severity), `${v.rule} has severity ${v.severity}`)
+  }
+  assert.ok(violations.some((v) => v.rule === 'frontmatter' && v.severity === 'error'))
+})
+
+test('11b. a rule set to off produces no violation; warn keeps it but demotes it', () => {
+  const files = {
+    'docs/engineering/a.md': GOOD,
+    'docs/engineering/b.md': doc({ title: 'B', kind: 'engineering', status: 'active', updated: '2026-08-17', implements: 'docs/nowhere.md' }),
+  }
+  const off = run(files, { config: { rules: { implements: 'off' } } })
+  assert.ok(!off.some((v) => v.rule === 'implements'))
+  const warn = run(files, { config: { rules: { implements: 'warn' } } })
+  assert.ok(warn.some((v) => v.rule === 'implements' && v.severity === 'warn'))
 })

@@ -63,20 +63,23 @@ function evidenceError(root, entry) {
 
 /**
  * @param {string} root repo root
- * @returns {{file: string, field: string, message: string}[]}
+ * @param {object} [config] resolved configuration; loaded from `root` by default
+ * @param {{base?: string, now?: Date}} [options] reserved for the git-aware and
+ *   date-aware assertions; ignored here
+ * @returns {{rule: string, file: string, field: string, message: string, severity: string}[]}
  */
-export function checkDocs(root, config = loadConfig(root)) {
+export function checkDocs(root, config = loadConfig(root), options = {}) {
   const violations = []
   const changeTargets = []
   const basenames = new Map()
   const listings = new Map()
   const exists = (target) => existsCaseExact(root, target, listings)
-  const add = (file, field, message) => violations.push({ file, field, message })
+  const add = (rule, file, field, message) => violations.push({ rule, file, field, message })
   const reserved = reservedStatuses(config)
 
   for (const path of listDocs(root, config)) {
     // 3. path hygiene — the check that makes `Tracking & Attribution` unrepeatable
-    for (const message of pathHygieneErrors(path, config)) add(path, 'path', message)
+    for (const message of pathHygieneErrors(path, config)) add('path', path, 'path', message)
 
     if (isExempt(config, path)) continue
 
@@ -85,18 +88,18 @@ export function checkDocs(root, config = loadConfig(root)) {
 
     // 1. frontmatter present
     if (!present) {
-      add(path, 'frontmatter', 'missing — every doc outside the exempt list needs a `---` block')
+      add('frontmatter', path, 'frontmatter', 'missing — every doc outside the exempt list needs a `---` block')
       continue
     }
 
     if (error) {
-      add(path, 'frontmatter', `is not valid YAML — ${error}`)
+      add('frontmatter', path, 'frontmatter', `is not valid YAML — ${error}`)
       continue
     }
 
     // 2. closed vocabularies, and status agrees with the tier
     for (const field of ['title', 'status', 'updated']) {
-      if (!data[field]) add(path, field, 'required field is missing or empty')
+      if (!data[field]) add('required', path, field, 'required field is missing or empty')
     }
 
     // 7. `kind` and `module` are stored AND derived, and must agree. The
@@ -105,21 +108,21 @@ export function checkDocs(root, config = loadConfig(root)) {
     const pathKind = kindForPath(config, path)
     const pathModule = moduleForPath(config, path)
 
-    if (!data.kind) add(path, 'kind', 'required field is missing or empty')
+    if (!data.kind) add('required', path, 'kind', 'required field is missing or empty')
     else if (pathKind === null) {
-      add(path, 'kind', `is "${data.kind}" but this path is under no tier — move the file`)
+      add('vocabulary', path, 'kind', `is "${data.kind}" but this path is under no tier — move the file`)
     } else if (data.kind !== pathKind) {
-      add(path, 'kind', `is "${data.kind}" but its path implies "${pathKind}" — set kind: ${pathKind}`)
+      add('vocabulary', path, 'kind', `is "${data.kind}" but its path implies "${pathKind}" — set kind: ${pathKind}`)
     }
 
     if (config.modules.length > 0) {
-      if (!data.module) add(path, 'module', 'required field is missing or empty')
+      if (!data.module) add('required', path, 'module', 'required field is missing or empty')
       else if (!config.moduleKeys.includes(data.module)) {
-        add(path, 'module', `"${data.module}" is not a registered module — one of ${config.moduleKeys.join(' | ')}`)
+        add('vocabulary', path, 'module', `"${data.module}" is not a registered module — one of ${config.moduleKeys.join(' | ')}`)
       } else if (pathModule === null) {
-        add(path, 'module', `is "${data.module}" but this path is in no module tree — move the file`)
+        add('vocabulary', path, 'module', `is "${data.module}" but this path is in no module tree — move the file`)
       } else if (data.module !== pathModule) {
-        add(path, 'module', `is "${data.module}" but its path implies "${pathModule}" — set module: ${pathModule}`)
+        add('vocabulary', path, 'module', `is "${data.module}" but its path implies "${pathModule}" — set module: ${pathModule}`)
       }
     }
     // 9. duplicate basenames within one tier and module. The naming half of
@@ -130,27 +133,27 @@ export function checkDocs(root, config = loadConfig(root)) {
     if (pathKind !== null && !config.sentinels.includes(base.replace(/\.md$/, ''))) {
       const key = `${pathKind}|${pathModule ?? ''}|${base.toLowerCase()}`
       const prior = basenames.get(key)
-      if (prior) add(path, 'basename', `duplicate basename in one tier — ${prior} has the same name; rename one`)
+      if (prior) add('basename', path, 'basename', `duplicate basename in one tier — ${prior} has the same name; rename one`)
       else basenames.set(key, path)
     }
 
     if (data.status && !config.statuses.includes(data.status)) {
-      add(path, 'status', `"${data.status}" is not one of ${config.statuses.join(' | ')}`)
+      add('vocabulary', path, 'status', `"${data.status}" is not one of ${config.statuses.join(' | ')}`)
     }
     const tier = pathKind
     const forced = statusForKind(config, tier)
     if (forced && data.status && data.status !== forced) {
-      add(path, 'status', `is "${data.status}" but everything under ${config.docsDir}/${tierPrefix(config, tier)} is status: ${forced}`)
+      add('vocabulary', path, 'status', `is "${data.status}" but everything under ${config.docsDir}/${tierPrefix(config, tier)} is status: ${forced}`)
     }
     const owner = data.status ? reserved.get(data.status) : undefined
     if (owner && tier !== owner) {
-      add(path, 'status', `\`${data.status}\` is reserved for ${config.docsDir}/${tierPrefix(config, owner)} — move the file or fix the status`)
+      add('vocabulary', path, 'status', `\`${data.status}\` is reserved for ${config.docsDir}/${tierPrefix(config, owner)} — move the file or fix the status`)
     }
     if (data.updated && !/^\d{4}-\d{2}-\d{2}$/.test(data.updated)) {
-      add(path, 'updated', `"${data.updated}" is not an ISO date`)
+      add('date', path, 'updated', `"${data.updated}" is not an ISO date`)
     }
     if (data.verified_on && !/^\d{4}-\d{2}-\d{2}$/.test(data.verified_on)) {
-      add(path, 'verified_on', `"${data.verified_on}" is not an ISO date`)
+      add('date', path, 'verified_on', `"${data.verified_on}" is not an ISO date`)
     }
 
     // 8. per-kind required fields. Which kind demands what is configuration,
@@ -158,14 +161,14 @@ export function checkDocs(root, config = loadConfig(root)) {
     for (const field of config.requiredFields[pathKind] ?? []) {
       const value = data[field]
       if (value == null || value === '' || (Array.isArray(value) && value.length === 0)) {
-        add(path, field, `required on kind: ${pathKind}`)
+        add('required', path, field, `required on kind: ${pathKind}`)
       }
     }
 
     // 8a. closed vocabularies for optional scalars (commitment).
     for (const [field, allowed] of Object.entries(config.vocabularies)) {
       if (data[field] && !allowed.includes(data[field])) {
-        add(path, field, `"${data[field]}" is not one of ${allowed.join(' | ')}`)
+        add('vocabulary', path, field, `"${data[field]}" is not one of ${allowed.join(' | ')}`)
       }
     }
 
@@ -173,7 +176,7 @@ export function checkDocs(root, config = loadConfig(root)) {
     if (Array.isArray(data.evidence)) {
       for (const entry of data.evidence) {
         const message = evidenceError(root, entry)
-        if (message) add(path, 'evidence', message)
+        if (message) add('evidence', path, 'evidence', message)
       }
     }
 
@@ -187,15 +190,15 @@ export function checkDocs(root, config = loadConfig(root)) {
     if (data.implements) {
       const target = data.implements.split('#')[0]
       if (!existsSync(join(root, target))) {
-        add(path, 'implements', `points at "${target}", which does not exist`)
+        add('implements', path, 'implements', `points at "${target}", which does not exist`)
       }
     }
 
     // 6. superseded implies a live superseded_by
     if (data.status === 'superseded') {
-      if (!data.superseded_by) add(path, 'superseded_by', 'required when status is `superseded`')
+      if (!data.superseded_by) add('superseded', path, 'superseded_by', 'required when status is `superseded`')
       else if (!existsSync(join(root, data.superseded_by))) {
-        add(path, 'superseded_by', `points at "${data.superseded_by}", which does not exist`)
+        add('superseded', path, 'superseded_by', `points at "${data.superseded_by}", which does not exist`)
       }
     }
 
@@ -204,7 +207,7 @@ export function checkDocs(root, config = loadConfig(root)) {
       const resolved = target.startsWith(`${config.docsDir}/`)
         ? target
         : relative(root, resolve(join(root, dirname(path)), target)).split(/[\\/]/).join('/')
-      if (!exists(resolved)) add(path, 'link', `dead link -> ${target}`)
+      if (!exists(resolved)) add('link', path, 'link', `dead link -> ${target}`)
     }
   }
 
@@ -212,12 +215,12 @@ export function checkDocs(root, config = loadConfig(root)) {
   // a todo pointing at another todo describes no reality and can never close.
   for (const { path, target } of changeTargets) {
     if (!exists(target)) {
-      add(path, 'changes', `points at "${target}", which does not exist`)
+      add('changes', path, 'changes', `points at "${target}", which does not exist`)
       continue
     }
     const targetKind = kindForPath(config, target)
     if (targetKind !== 'state') {
-      add(path, 'changes', `points at "${target}", which is kind "${targetKind ?? 'none'}" — changes must name state documents`)
+      add('changes', path, 'changes', `points at "${target}", which is kind "${targetKind ?? 'none'}" — changes must name state documents`)
     }
   }
 
@@ -227,7 +230,7 @@ export function checkDocs(root, config = loadConfig(root)) {
   // unchecked because historical plans legitimately narrate old paths.
   for (const target of trackedDocRefs(root, config)) {
     if (!exists(target)) {
-      add('(repo)', 'link', `a tracked file references ${target}, which does not exist — git grep -l '${target}'`)
+      add('link', '(repo)', 'link', `a tracked file references ${target}, which does not exist — git grep -l '${target}'`)
     }
   }
 
@@ -237,11 +240,22 @@ export function checkDocs(root, config = loadConfig(root)) {
   for (const [path, content] of renderIndex(root, config)) {
     const current = existsSync(join(root, path)) ? readFileSync(join(root, path), 'utf8') : null
     if (current?.replaceAll('\r\n', '\n') !== content) {
-      add(path, 'index', 'stale — run `node scripts/gen-docs-index.mjs`')
+      add('index', path, 'index', 'stale — run `node scripts/gen-docs-index.mjs`')
     }
   }
 
-  return violations
+  return applySeverity(config, violations)
+}
+
+/** Drop rules configured `off`, stamp the configured severity on the rest. */
+export function applySeverity(config, violations) {
+  const out = []
+  for (const violation of violations) {
+    const severity = config.rules[violation.rule] ?? 'error'
+    if (severity === 'off') continue
+    out.push({ ...violation, severity })
+  }
+  return out
 }
 
 /**
@@ -337,15 +351,22 @@ const PRINT_CAP = 100
 export function main() {
   const violations = checkDocs(repoRoot())
   const cap = process.argv.includes('--all') ? Infinity : PRINT_CAP
-  if (violations.length === 0) {
-    console.log('check-docs: OK')
+  // Warnings are advisory: they are always printed in full and never decide the
+  // exit code, so a `warn` rule can be adopted before it is enforced.
+  const errors = violations.filter((violation) => violation.severity === 'error')
+  const warnings = violations.filter((violation) => violation.severity === 'warn')
+  for (const { rule, file, field, message } of warnings) {
+    console.error(`${file}:${field} — ${message} [${rule}, warn]`)
+  }
+  if (errors.length === 0) {
+    console.log(warnings.length === 0 ? 'check-docs: OK' : `check-docs: OK (${warnings.length} warning(s))`)
     process.exit(0)
   }
-  for (const { file, field, message } of violations.slice(0, cap)) {
-    console.error(`${file}:${field} — ${message}`)
+  for (const { rule, file, field, message } of errors.slice(0, cap)) {
+    console.error(`${file}:${field} — ${message} [${rule}]`)
   }
-  if (violations.length > cap) console.error(`… and ${violations.length - cap} more`)
-  console.error(`\ncheck-docs FAILED — ${violations.length} violation(s).`)
+  if (errors.length > cap) console.error(`… and ${errors.length - cap} more`)
+  console.error(`\ncheck-docs FAILED — ${errors.length} violation(s).`)
   process.exit(1)
 }
 

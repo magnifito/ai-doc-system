@@ -14,6 +14,37 @@ import { join } from 'node:path'
 export const CONFIG_FILE = 'docs-system.config.json'
 
 /**
+ * Every rule the gate and the advisory pass know, with its default severity.
+ * `error` fails the gate, `warn` is printed and never fails, `off` is silent.
+ * A project overrides one id at a time in `rules`; unknown ids are rejected so
+ * a typo cannot silently leave a rule at its default.
+ */
+export const RULES = {
+  frontmatter: 'error',
+  required: 'error',
+  vocabulary: 'error',
+  date: 'error',
+  path: 'error',
+  basename: 'error',
+  link: 'error',
+  implements: 'error',
+  superseded: 'error',
+  evidence: 'error',
+  changes: 'error',
+  'source-url': 'error',
+  summary: 'error',
+  index: 'error',
+  transition: 'error',
+  'promoted-verbatim': 'error',
+  'shipped-code': 'warn',
+  upstream: 'warn',
+  review: 'warn',
+}
+
+/** The severities a rule may carry. */
+export const SEVERITIES = ['error', 'warn', 'off']
+
+/**
  * The defaults are the tiering this system was designed against: documents
  * grouped by AUTHORITY (how much weight a reader should give them), not topic.
  * Change `tiers` and you change what `kind` a path implies — nothing else.
@@ -21,6 +52,9 @@ export const CONFIG_FILE = 'docs-system.config.json'
 export const DEFAULTS = {
   /** Directory holding the documentation tree, relative to the repo root. */
   docsDir: 'docs',
+
+  /** Per-rule severity overrides, merged over `RULES`. */
+  rules: {},
 
   /**
    * Ordered `[prefix, kind]` pairs, prefixes relative to `docsDir`. FIRST MATCH
@@ -150,6 +184,7 @@ export function loadConfig(root) {
     }
   }
   const merged = { ...DEFAULTS, ...overrides }
+  merged.rules = { ...RULES, ...(overrides.rules ?? {}) }
   validate(overrides, merged)
   const config = withDerived(merged)
   cache.set(root, config)
@@ -168,6 +203,8 @@ export function withDerived(config) {
     kinds: [...new Set(config.tiers.map(([, kind]) => kind))],
     moduleKeys: [...config.modules.map((entry) => entry.key), config.platformKey],
     exemptPaths: new Set(config.exempt.map((name) => `${config.docsDir}/${name}`)),
+    // Callers that build a config from DEFAULTS directly still get the full map.
+    rules: { ...RULES, ...(config.rules ?? {}) },
   }
 }
 
@@ -186,6 +223,12 @@ function validate(overrides, merged) {
   for (const key of Object.keys(overrides)) {
     if (!(key in DEFAULTS)) {
       throw new Error(`${CONFIG_FILE}: unknown key "${key}" — known keys are ${Object.keys(DEFAULTS).join(', ')}`)
+    }
+  }
+  for (const [id, severity] of Object.entries(overrides.rules ?? {})) {
+    if (!(id in RULES)) throw new Error(`${CONFIG_FILE}: unknown rule "${id}" — known rules are ${Object.keys(RULES).join(', ')}`)
+    if (!SEVERITIES.includes(severity)) {
+      throw new Error(`${CONFIG_FILE}: rule "${id}" has severity "${severity}" — expected ${SEVERITIES.join(' | ')}`)
     }
   }
   for (const entry of merged.tiers) {
