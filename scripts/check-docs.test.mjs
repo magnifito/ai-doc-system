@@ -638,7 +638,36 @@ test('13e. a summary containing a pipe is escaped in the INDEX.md table', () => 
 
 test('13f. a summary that is not one string is a violation, not a crash', () => {
   const list = run({ 'docs/engineering/x.md': '---\ntitle: X\nkind: engineering\nstatus: active\nupdated: 2026-08-17\nsummary:\n  - one\n  - two\n---\n# X\n' })
-  assert.ok(list.some((v) => v.rule === 'summary' && /not a list or a map/.test(v.message)))
+  assert.ok(list.some((v) => v.rule === 'vocabulary' && v.field === 'summary' && /not a list or a map/.test(v.message)))
   const map = run({ 'docs/engineering/x.md': '---\ntitle: X\nkind: engineering\nstatus: active\nupdated: 2026-08-17\nsummary:\n  a: b\n---\n# X\n' })
-  assert.ok(map.some((v) => v.rule === 'summary' && /not a list or a map/.test(v.message)))
+  assert.ok(map.some((v) => v.rule === 'vocabulary' && v.field === 'summary' && /not a list or a map/.test(v.message)))
+})
+
+test('13g. a non-scalar value in a scalar field is a violation, never a crash', () => {
+  // Every one of these crashed a renderer or a check before the shape pass:
+  // `.replace` on a title, `.split` on implements, `join()` on superseded_by.
+  const cases = [
+    ['title', '---\ntitle:\n  a: b\nkind: engineering\nstatus: active\nupdated: 2026-08-17\n---\n# X\n', 'docs/engineering/x.md'],
+    ['implements', '---\ntitle: X\nkind: engineering\nstatus: active\nupdated: 2026-08-17\nimplements:\n  a: b\n---\n# X\n', 'docs/engineering/x.md'],
+    ['superseded_by', '---\ntitle: Old\nkind: archive\nstatus: superseded\nupdated: 2026-08-09\nsuperseded_by:\n  a: b\n---\n# Old\n', 'docs/archive/old.md'],
+    ['code', '---\ntitle: X\nkind: engineering\nstatus: active\nupdated: 2026-08-17\ncode:\n  - one\n  - two\n---\n# X\n', 'docs/engineering/x.md'],
+  ]
+  for (const [field, source, path] of cases) {
+    const violations = run({ [path]: source })
+    assert.ok(
+      violations.some((v) => v.rule === 'vocabulary' && v.field === field && /not a list or a map/.test(v.message)),
+      `expected a vocabulary violation on ${field}`,
+    )
+  }
+  // A deleted title is then genuinely absent, so the required check fires too.
+  const titled = run({ 'docs/engineering/x.md': cases[0][1] })
+  assert.ok(titled.some((v) => v.rule === 'required' && v.field === 'title'))
+})
+
+test('13h. a list field that is not a list is a violation', () => {
+  const violations = run(
+    { 'docs/modules/crm/state/s.md': '---\ntitle: S\nkind: state\nmodule: crm\nstatus: active\nupdated: 2026-08-17\nverified_on: 2026-08-17\nevidence:\n  a: b\n---\n# S\n' },
+    { config: { modules: [{ key: 'crm', class: 'anchor' }], tiers: [['modules/*/state/', 'state'], ...DEFAULTS.tiers], requiredFields: { state: ['verified_on', 'evidence'] } } },
+  )
+  assert.ok(violations.some((v) => v.rule === 'evidence' && v.field === 'evidence' && /must be a list/.test(v.message)))
 })

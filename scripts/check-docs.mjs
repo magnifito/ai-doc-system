@@ -31,7 +31,7 @@ import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join, dirname, resolve, relative } from 'node:path'
 import { runDirect } from './docs-run.mjs'
-import { parseFrontmatter } from './docs-frontmatter.mjs'
+import { LIST_FIELDS, SCALAR_FIELDS, parseFrontmatter } from './docs-frontmatter.mjs'
 import { loadConfig } from './docs-config.mjs'
 import { isIsoDate } from './docs-dates.mjs'
 import { isExempt, kindForPath, moduleForPath, pathHygieneErrors, reservedStatuses, statusForKind } from './docs-taxonomy.mjs'
@@ -99,6 +99,25 @@ export function checkDocs(root, config = loadConfig(root), options = {}) {
       continue
     }
 
+    // 1a. SHAPE, before anything reads a value. YAML lets any field be written
+    // as a list or a map, and the checks below — plus the index renderers —
+    // call `.split`, `.replace` and `join()` on these. Report the wrong shape
+    // once here and DELETE the key, so every downstream check sees the field as
+    // absent rather than crashing on it. A dropped `title` then also reports
+    // `required`, which is the right answer: a map is not a title.
+    for (const field of SCALAR_FIELDS) {
+      if (field in data && typeof data[field] !== 'string') {
+        add('vocabulary', path, field, 'must be a single value, not a list or a map')
+        delete data[field]
+      }
+    }
+    for (const field of LIST_FIELDS) {
+      if (field in data && !Array.isArray(data[field])) {
+        add(field, path, field, 'must be a list')
+        delete data[field]
+      }
+    }
+
     // 2. closed vocabularies, and status agrees with the tier
     for (const field of ['title', 'status', 'updated']) {
       if (!data[field]) add('required', path, field, 'required field is missing or empty')
@@ -161,13 +180,11 @@ export function checkDocs(root, config = loadConfig(root), options = {}) {
     // 2a. the optional authority fields. `summary` is the one line the index
     // shows, so it must be a line: an empty value is a half-written field, and
     // a multi-line block would break the generated table.
+    // Shape is already settled above, so `summary` is a string or absent here.
     if ('summary' in data) {
-      const summary = data.summary
-      if (typeof summary !== 'string') {
-        add('summary', path, 'summary', 'must be one line of text, not a list or a map')
-      } else if (summary.trim() === '') {
+      if (data.summary.trim() === '') {
         add('summary', path, 'summary', 'is present but empty — write one line or remove the field')
-      } else if (summary.includes('\n')) {
+      } else if (data.summary.includes('\n')) {
         add('summary', path, 'summary', 'must be one line')
       }
     }

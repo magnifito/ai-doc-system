@@ -18,6 +18,16 @@ import { isExempt, kindForPath, moduleForPath } from './docs-taxonomy.mjs'
 import { listDocs, repoRoot } from './docs-fs.mjs'
 import { runDirect } from './docs-run.mjs'
 
+/**
+ * A scalar field's value, or undefined when it is not one. The gate reports a
+ * list- or map-valued scalar as a violation; the index simply must not carry it,
+ * because the renderers below call `.replace` on what they are given and the
+ * gate itself regenerates the index in memory before it can report anything.
+ */
+function str(data, key) {
+  return typeof data[key] === 'string' ? data[key] : undefined
+}
+
 export function buildIndex(root, config = loadConfig(root)) {
   const entries = []
   for (const path of listDocs(root, config)) {
@@ -25,24 +35,22 @@ export function buildIndex(root, config = loadConfig(root)) {
     const { data } = parseFrontmatter(readFileSync(join(root, path), 'utf8'))
     entries.push({
       path,
-      title: data.title ?? '',
-      // Only a string: a list- or map-valued summary is a defect the gate
-      // reports, and carrying it here would crash the table renderer instead.
-      ...(typeof data.summary === 'string' && data.summary ? { summary: data.summary } : {}),
+      title: str(data, 'title') ?? '',
+      ...(str(data, 'summary') ? { summary: data.summary } : {}),
       kind: kindForPath(config, path) ?? '',
       // Omitted rather than empty when the project declares no modules, so a
       // tree that does not use the axis keeps a byte-identical index.
       ...(moduleForPath(config, path) ? { module: moduleForPath(config, path) } : {}),
-      status: data.status ?? '',
-      updated: data.updated ?? '',
-      ...(data.review_by ? { review_by: data.review_by } : {}),
-      ...(data.verified_on ? { verified_on: data.verified_on } : {}),
-      ...(data.commitment ? { commitment: data.commitment } : {}),
+      status: str(data, 'status') ?? '',
+      updated: str(data, 'updated') ?? '',
+      ...(str(data, 'review_by') ? { review_by: data.review_by } : {}),
+      ...(str(data, 'verified_on') ? { verified_on: data.verified_on } : {}),
+      ...(str(data, 'commitment') ? { commitment: data.commitment } : {}),
       ...(Array.isArray(data.changes) && data.changes.length > 0 ? { changes: data.changes } : {}),
-      ...(data.implements ? { implements: data.implements } : {}),
-      ...(data.code ? { code: data.code } : {}),
-      ...(data.source_url ? { source_url: data.source_url } : {}),
-      ...(data.superseded_by ? { superseded_by: data.superseded_by } : {}),
+      ...(str(data, 'implements') ? { implements: data.implements } : {}),
+      ...(str(data, 'code') ? { code: data.code } : {}),
+      ...(str(data, 'source_url') ? { source_url: data.source_url } : {}),
+      ...(str(data, 'superseded_by') ? { superseded_by: data.superseded_by } : {}),
     })
   }
   // listDocs is already sorted; keep plain codepoint order (NOT localeCompare,

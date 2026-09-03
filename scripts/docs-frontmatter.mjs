@@ -76,6 +76,14 @@ export const FIELD_ORDER = [
 /** Fields rendered as a block sequence rather than a scalar. */
 export const LIST_FIELDS = new Set(['evidence', 'changes'])
 
+/**
+ * Every schema field that must be a single value. YAML lets any of them be
+ * written as a list or a map, and consumers reasonably call `.split`, `.replace`
+ * or `join()` on them — so the gate normalises shape against this list once,
+ * before any field check runs, rather than each caller guarding its own field.
+ */
+export const SCALAR_FIELDS = FIELD_ORDER.filter((field) => !LIST_FIELDS.has(field))
+
 /** Quote a scalar only when leaving it bare would change how YAML reads it. */
 function scalar(value) {
   const text = String(value)
