@@ -23,15 +23,15 @@ id in `title=`. Under `--base <ref>` two more rules run against the branch's his
 | Rule | It means | Fix |
 |---|---|---|
 | `frontmatter` | No `---` block, or YAML the parser rejects. | Add the block with `ai-doc-system new` for a new file, or repair the YAML (quote a value with a colon). |
-| `required` | A required field is missing: `title`, `kind`, `status`, `updated`, or a project-required field. | Add it. `kind` and `module` come from `ai-doc-system fix`. |
-| `vocabulary` | A value is outside the declared set, a field has the wrong shape (a list where a scalar belongs, or the reverse), or stored `kind`/`module` disagrees with what the path implies. | Use a declared `kind`/`status`; `module` from the config; lists for `evidence` and `changes`, a single path for `code`, strings elsewhere. `ai-doc-system fix` restamps `kind`/`module` to match the path; if the path itself is wrong, docs-promote moves the file. |
+| `required` | A required field is missing: `title`, `kind`, `status`, `updated`, `module` (when the project configures modules), or a project-required field. | Add it. `kind` and `module` come from `ai-doc-system fix`. |
+| `vocabulary` | A value is outside the declared set, a scalar field is written as a list or a map, or stored `kind`/`module` disagrees with what the path implies. | Use a declared `kind`/`status`; `module` from the config; lists for `evidence` and `changes`, a single path for `code`, strings elsewhere. `ai-doc-system fix` restamps `kind`/`module` to match the path; if the path itself is wrong, docs-promote moves the file. |
 | `date` | `updated`, `review_by` or `verified_on` is not a real `YYYY-MM-DD` date. | Write the real date. `2026-13-45` is refused. |
 | `path` | A directory segment or file name is not kebab-case, or an ALL-CAPS basename is not a declared sentinel or prefix. | Rename the file or directory (two `git mv`s for a case-only rename), or declare it in `sentinels` / `allowedBasenamePrefixes`. |
 | `basename` | Two documents in one tier (and module) share a basename. | Rename one, or declare it in `sentinels` if it is a per-folder entry point. |
 | `link` | A Markdown link or a tracked file names a document that does not exist case-exactly. | Point at the real file; de-link text whose target never existed. |
 | `implements` | The `implements` target is missing. | Point at the live document. |
 | `superseded` | `superseded_by` is missing (required when `status: superseded`), or points at a missing file. | Set it, pointing at a file that exists. |
-| `evidence` | A path does not exist, or a command's first word is not an allowed runner. | Fix the path; add the runner to `evidenceRunners` only if the project trusts it. |
+| `evidence` | A path does not exist, a command's first word is not an allowed runner, or the field is not a list. | Fix the path or write `evidence` as a list; add the runner to `evidenceRunners` only if the project trusts it. |
 | `changes` | A `changes` target does not exist, is not a `state` document, or the field is not a list. | Point at a live `state` document; write `changes` as a list. |
 | `source-url` | `source_url` is not `http(s)://`. | Write the URL. |
 | `summary` | `summary` is present but empty, or spans more than one line. | One sentence. |
