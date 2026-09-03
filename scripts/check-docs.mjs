@@ -18,7 +18,8 @@
  *      is; this assertion is what makes the duplication safe
  *   8. per-kind required fields (config.requiredFields), closed vocabularies for
  *      optional scalars, every `evidence` entry a live path or a runnable
- *      command, and every `changes` target a live document of kind `state`
+ *      command, every `changes` target a live document of kind `state`, and a
+ *      warning when path evidence drifted from the hash `verify` locked
  *   9. no two documents in one tier (and module) share a basename — the naming
  *      rule stops the same name in two CASINGS; this stops it verbatim
  *
@@ -37,6 +38,7 @@ import { isIsoDate } from './docs-dates.mjs'
 import { isExempt, kindForPath, moduleForPath, pathHygieneErrors, reservedStatuses, statusForKind } from './docs-taxonomy.mjs'
 import { listDocs, repoRoot } from './docs-fs.mjs'
 import { renderIndex } from './gen-docs-index.mjs'
+import { hashEvidence, parsePathEvidence, readLock } from './verify-docs.mjs'
 
 /**
  * Evidence entries are the one field whose VALUE the gate inspects, because an
@@ -73,6 +75,9 @@ export function checkDocs(root, config = loadConfig(root), options = {}) {
   const exists = (target) => existsCaseExact(root, target, listings)
   const add = (rule, file, field, message) => violations.push({ rule, file, field, message })
   const reserved = reservedStatuses(config)
+  // Read once: every document's lock rows come out of the same file. A repo
+  // that has never run `verify` has no lock, and no `evidence-lock` warnings.
+  const lock = readLock(root, config)
 
   for (const path of listDocs(root, config)) {
     // 3. path hygiene — the check that makes `Tracking & Attribution` unrepeatable
@@ -208,9 +213,22 @@ export function checkDocs(root, config = loadConfig(root), options = {}) {
 
     // 8b. evidence entries are paths that exist, or commands.
     if (Array.isArray(data.evidence)) {
+      const locked = lock.entries[path] ?? {}
       for (const entry of data.evidence) {
         const message = evidenceError(entry, exists, config.evidenceRunners)
-        if (message) add('evidence', path, 'evidence', message)
+        if (message) {
+          add('evidence', path, 'evidence', message)
+          continue // a path that no longer exists is already the bigger defect
+        }
+        // 8d. evidence-lock — the entry still exists, but what it points at is
+        // no longer what was verified. A warning: the code moving on is normal,
+        // silently keeping the old `verified_on` is not.
+        const parsed = locked[entry] ? parsePathEvidence(entry) : null
+        if (!parsed) continue
+        const current = hashEvidence(root, parsed)
+        if (current && current !== locked[entry]) {
+          add('evidence-lock', path, 'evidence', `"${entry}" changed since it was verified — run \`ai-doc-system verify --only ${path} --stamp\``)
+        }
       }
     }
 

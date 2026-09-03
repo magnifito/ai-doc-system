@@ -13,6 +13,7 @@ const COMMANDS = {
   new: ['new-doc.mjs', 'write a gate-clean document at <path>'],
   mv: ['mv-doc.mjs', 'git mv + restamp + regenerate (promotion)'],
   check: ['check-docs.mjs', 'run the blocking gate'],
+  verify: ['verify-docs.mjs', 'RUNS command evidence (explicit only), hashes path evidence, --stamp verified_on'],
   advisory: ['check-docs-advisory.mjs', 'non-blocking drift report'],
   impact: ['impact-docs.mjs', 'documents whose claims cover the changed paths'],
   gen: ['gen-docs-index.mjs', 'regenerate INDEX.md and index.json'],

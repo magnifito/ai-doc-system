@@ -30,6 +30,7 @@ export const RULES = {
   implements: 'error',
   superseded: 'error',
   evidence: 'error',
+  'evidence-lock': 'warn',
   changes: 'error',
   'source-url': 'error',
   summary: 'error',

@@ -258,3 +258,17 @@ test('impact with an unresolvable --base says so on stderr and still exits 0', (
     rmSync(root, { recursive: true, force: true })
   }
 })
+
+test('verify runs a document command and reports the tally', () => {
+  const root = gitFixture({
+    'docs/engineering/verified.md':
+      '---\ntitle: Verified\nkind: engineering\nstatus: active\nupdated: 2026-08-27\nevidence:\n  - node -e "process.exit(0)"\n---\n\n# Verified\n',
+  })
+  try {
+    const { status, stdout } = cliResult(['verify'], { cwd: root })
+    assert.equal(status, 0)
+    assert.match(stdout, /verify: 1 passed, 0 failed/)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
