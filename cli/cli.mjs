@@ -44,5 +44,11 @@ if (!COMMANDS[command]) {
 // module keeps one entry point.
 if (command === 'export' && !process.argv.includes('--jsonl')) process.argv.push('--jsonl')
 
+// Every script parses `process.argv.slice(2)` as its own arguments, so the
+// dispatcher must not leave the command word in place — otherwise a script
+// invoked through the CLI sees an extra leading positional that direct
+// invocation (`node scripts/foo.mjs ...`) never would.
+process.argv.splice(2, 1)
+
 const mod = await import(new URL(`../scripts/${COMMANDS[command][0]}`, import.meta.url))
 await mod.main()

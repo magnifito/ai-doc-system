@@ -136,18 +136,18 @@ const USAGE = [
 
 const VALUE_FLAGS = { '--kind': 'kind', '--status': 'status', '--module': 'module', '--max-chars': 'maxChars' }
 
-/** Dispatched through `cli/cli.mjs`, argv still carries the leading command word. */
-const COMMAND_WORDS = ['context', 'export']
-
 /**
  * Positionals are document paths, `.md` and nothing else. Everything the caller
  * did not mean — a mistyped `--satus`, a directory, a path with the extension
  * dropped, a flag left without its value — is an error rather than a silently
  * ignored filter: a filter that quietly disappears dumps the whole tree, which
  * is the worst possible failure for a command that feeds a context window.
+ *
+ * `argv` is exactly the script's own arguments (`process.argv.slice(2)`); the
+ * dispatcher (`cli/cli.mjs`) removes the command word before delegating, so
+ * this function never sees `context` or `export` and must not strip it itself.
  */
-export function parseArgs(argv) {
-  const args = COMMAND_WORDS.includes(argv[0]) ? argv.slice(1) : argv
+export function parseArgs(args) {
   const options = { paths: [] }
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index]

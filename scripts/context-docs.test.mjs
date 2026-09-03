@@ -146,6 +146,11 @@ test('parseArgs rejects a value flag with no value and a non-numeric budget', ()
 })
 
 test('parseArgs rejects a positional that is not a document path', () => {
-  assert.match(parseArgs(['context', 'docs/product']).error, /not a document path docs\/product/)
-  assert.deepEqual(parseArgs(['context', 'docs/product/p.md']).paths, ['docs/product/p.md'])
+  // parseArgs receives exactly the script's own arguments — no leading command
+  // word. The dispatcher (`cli/cli.mjs`) strips `context`/`export` before
+  // delegating, so a stray command word reaching here is itself just another
+  // non-.md positional and must be rejected the same way.
+  assert.match(parseArgs(['docs/product']).error, /not a document path docs\/product/)
+  assert.match(parseArgs(['context']).error, /not a document path context/)
+  assert.deepEqual(parseArgs(['docs/product/p.md']).paths, ['docs/product/p.md'])
 })

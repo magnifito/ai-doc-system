@@ -372,3 +372,21 @@ test('context with a positional that is not a document path exits 2', () => {
     rmSync(root, { recursive: true, force: true })
   }
 })
+
+test('running context-docs.mjs directly does not swallow the command word', () => {
+  // `node scripts/context-docs.mjs context` — direct invocation, bypassing
+  // cli/cli.mjs entirely. Regression check for the command word reaching
+  // parseArgs as a stray positional and dumping the whole tree instead of
+  // erroring: `context` is not a `.md` path, so it must be rejected exactly
+  // like any other non-document positional.
+  const root = gitFixture({ 'docs/product/p.md': '---\ntitle: P\nkind: product\nstatus: active\nupdated: 2026-08-27\n---\n\n# P\n' })
+  try {
+    const script = join(PACKAGE_ROOT, 'scripts', 'context-docs.mjs')
+    const { status, stdout, stderr } = spawnSync(process.execPath, [script, 'context'], { encoding: 'utf8', stdio: 'pipe', cwd: root })
+    assert.equal(status, 2)
+    assert.match(stderr, /context: not a document path context/)
+    assert.equal(stdout, '')
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
