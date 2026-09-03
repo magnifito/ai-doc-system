@@ -66,6 +66,8 @@ jobs:
             > docs/engineering/smoke.md
           npm init -y > /dev/null
           npm install "$TARBALL"
+          # Missing `files` entry check: skills/ must ship, SKILL.md must not.
+          test -f node_modules/@puralex/ai-doc-system/skills/docs-gate/SKILL.md
           npx ai-doc-system --version
           npx ai-doc-system gen
           npx ai-doc-system check

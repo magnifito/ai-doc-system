@@ -5,6 +5,27 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-09-03
+
+### Added
+
+- Five skills under `skills/`, each self-contained and triggered by the situation an agent is in:
+  `docs-adopt` (first-time setup and migration), `docs-write` (add or edit a document),
+  `docs-promote` (promote, move, supersede), `docs-audit` (periodic judgement: advisory, verify,
+  impact) and `docs-gate` (fix a red gate).
+- `scripts/skills.test.mjs`: a test that keeps the skill set structurally honest — every
+  `skills/<name>/SKILL.md` exists, the root `SKILL.md` is gone, and no skill references the old
+  single-file section numbering.
+
+### Changed
+
+- The root `SKILL.md` is gone; Claude Code ignores it once a `skills/` directory exists.
+- `${CLAUDE_SKILL_DIR}` replaced by `${CLAUDE_PLUGIN_ROOT}` throughout hooks and skill text.
+
+### Removed
+
+- `SKILL.md` from the npm `files` list; `skills/` ships instead.
+
 ## [1.3.0] - 2026-09-03
 
 ### Added
@@ -128,6 +149,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Optional module axis with `state` / `todo` kinds (`evidence` / `changes` validation).
 - `SKILL.md` agent procedure.
 
+[1.4.0]: https://github.com/magnifito/ai-doc-system/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/magnifito/ai-doc-system/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/magnifito/ai-doc-system/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/magnifito/ai-doc-system/compare/v1.0.0...v1.1.0

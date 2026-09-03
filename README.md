@@ -39,7 +39,7 @@ into an explicitly non-binding idea bank, and it is checkable by machine.
 | `schema/docs-system.config.schema.json` | JSON Schema for `docs-system.config.json`: editor completion and validation of every key. |
 | `scripts/docs-config.mjs` | Per-project configuration, with defaults that need no config file. |
 | `scripts/*.test.mjs` | The test suite, over throwaway fixture trees, some of them real git repositories. Wire it in — a suite no runner executes is green exactly once. |
-| `SKILL.md` | The agent-facing procedure, including the judgement calls the mechanics do not cover. |
+| `skills/` | Five skills an agent picks by situation: `docs-adopt` (first-time setup and migration), `docs-write` (add or edit a document), `docs-promote` (promote, move, supersede), `docs-audit` (periodic judgement: advisory, verify, impact), `docs-gate` (fix a red gate). |
 | `templates/` | The migration map to fill in, and the `docs/README.md` contract to adapt. |
 | `cli/cli.mjs` | Package entry point — `ai-doc-system init\|new\|mv\|check\|verify\|advisory\|impact\|context\|export\|gen\|fix\|migrate` — for npm-based installs. |
 | `docs/` | This repo's own gated tree; `engineering/design.md` is the full design: the problem, the rejected alternatives, and the limitations that survived implementation. |
@@ -227,11 +227,10 @@ Or install as a Claude Code plugin and let an agent drive it:
 /plugin install docs-notary@magnifito
 ```
 
-(A plain `git clone https://github.com/magnifito/ai-doc-system ~/.claude/skills/docs-notary`
-also works — the repo carries its own `.claude-plugin/plugin.json`.)
+(Without the plugin system, copy `skills/*` into `~/.claude/skills/`.)
 
-Then, in the target repository, ask for the documentation system. [`SKILL.md`](SKILL.md) is the
-procedure: survey first, migrate, then the rules that outlive the migration.
+Then, in the target repository, ask for the documentation system; the `docs-adopt` skill runs the
+survey and the migration, and the other four take over once `docs/index.json` exists.
 
 By hand, the short version:
 

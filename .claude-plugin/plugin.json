@@ -1,7 +1,7 @@
 {
   "name": "docs-notary",
-  "description": "Tier a repository's docs by authority, validate frontmatter, generate an agent-readable index, and enforce it with a blocking gate.",
-  "version": "1.3.0",
+  "description": "Tier a repository's docs by authority, validate frontmatter, generate an agent-readable index, and enforce it with a blocking gate. Five skills: docs-adopt, docs-write, docs-promote, docs-audit, docs-gate.",
+  "version": "1.4.0",
   "author": { "name": "Kiril Kirov" },
   "homepage": "https://magnifito.github.io/ai-doc-system/",
   "repository": "https://github.com/magnifito/ai-doc-system",
