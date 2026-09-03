@@ -16,10 +16,13 @@ Promote it first, then **rewrite the prose to describe this product**:
 ai-doc-system mv docs/reference/<name>.md docs/product/<name>.md
 ```
 
-`mv` is `git mv` plus a restamp: it sets `kind`, `module` and `status` for the destination, sets
-`updated` to today (a promotion is a substantive change and the rewrite is mandatory), and records
+`mv` is `git mv` plus a restamp: it sets `kind` and `module` for the destination, and sets `status`
+to the destination tier's forced status if it has one, else `--status`, else `draft` when leaving
+`reference`, else the status the document already had. `product/` forces nothing and no `--status`
+is passed above, so this example lands on `draft` — the `reference → draft` edge. `mv` also sets
+`updated` to today (a promotion is a substantive change and the rewrite is mandatory) and records
 `promoted_from`. That field is what lets `check --base` tell a promotion from a copy. A bare
-`git mv` writes no `promoted_from` and fails `promoted-verbatim`.
+`git mv` across tiers records no `promoted_from` and fails `promoted-verbatim` under `check --base`.
 
 Then rewrite. Promoting a captured document verbatim is how someone else's assumptions become your
 requirements. `check --base <ref>` compares the promoted body with the origin's body before the
@@ -43,9 +46,10 @@ An unchanged status is always legal. A status the project added in its config is
 moves freely. `reference/` forces `reference`; `archive/` forces `superseded`.
 
 - **`draft` → `active`**: the work is agreed. Bump `updated`.
-- **`active` → `shipped`**: only with `code:` naming the paths that exist and `evidence:` the gate
-  can check. Never on the strength of the plan's own "done" prose; if in doubt, docs-audit runs
-  `verify` first.
+- **`active` → `shipped`**: convention, not enforcement — name the paths in `code:` and give
+  `evidence:` the gate can check anyway; `shipped` without `code:` only warns (`shipped-code`), and
+  the gate requires `evidence:` on no kind by default. Never ship on the strength of the plan's own
+  "done" prose; if in doubt, docs-audit runs `verify` first.
 - **`active` → `draft`**: the plan was reopened. Say why in the body.
 
 ## 3. Supersede, then archive
@@ -54,7 +58,8 @@ When a newer document replaces an older one:
 
 1. Set `superseded_by: docs/<tier>/<new-name>.md` on the old file and `status: superseded`.
 2. Move it: `ai-doc-system mv docs/<tier>/<old-name>.md docs/archive/<old-name>.md`.
-3. Fix every link that pointed at it — the gate fails a link to a superseded document.
+3. Fix every link that pointed at it — the gate will not catch these; `link` only fails a target
+   that is missing.
 
 A document whose own first line says SUPERSEDED belongs in `archive/` whatever its frontmatter
 says. A "closed" plan that still lists untaken steps is a live backlog and stays `active`.
