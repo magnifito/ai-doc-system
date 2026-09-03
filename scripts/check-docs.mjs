@@ -33,6 +33,7 @@ import { join, dirname, resolve, relative } from 'node:path'
 import { runDirect } from './docs-run.mjs'
 import { parseFrontmatter } from './docs-frontmatter.mjs'
 import { loadConfig } from './docs-config.mjs'
+import { isIsoDate } from './docs-dates.mjs'
 import { isExempt, kindForPath, moduleForPath, pathHygieneErrors, reservedStatuses, statusForKind } from './docs-taxonomy.mjs'
 import { listDocs, repoRoot } from './docs-fs.mjs'
 import { renderIndex } from './gen-docs-index.mjs'
@@ -50,14 +51,16 @@ import { renderIndex } from './gen-docs-index.mjs'
 const EVIDENCE_PATH = /^([A-Za-z0-9._\-/[\]()@]+)(?::\d+(?:-\d+)?)?$/
 const EVIDENCE_RUNNERS = ['bun', 'bunx', 'node', 'npm', 'npx', 'grep', 'ls', 'git', 'curl', 'psql']
 
-function evidenceError(root, entry) {
+function evidenceError(root, entry, exists) {
   const first = entry.trim().split(/\s+/)[0]
   if (EVIDENCE_RUNNERS.includes(first)) return null
   const match = entry.trim().match(EVIDENCE_PATH)
   if (!match) {
     return `"${entry}" is not a path or a command — start it with ${EVIDENCE_RUNNERS.join('/')} or name a file`
   }
-  if (!existsSync(join(root, match[1]))) return `"${entry}" names ${match[1]}, which does not exist`
+  // A trailing slash is legitimate for directory evidence; `exists` checks
+  // every segment against its parent listing, so it is stripped first.
+  if (!exists(match[1].replace(/\/$/, ''))) return `"${entry}" names ${match[1]}, which does not exist`
   return null
 }
 
@@ -149,10 +152,10 @@ export function checkDocs(root, config = loadConfig(root), options = {}) {
     if (owner && tier !== owner) {
       add('vocabulary', path, 'status', `\`${data.status}\` is reserved for ${config.docsDir}/${tierPrefix(config, owner)} — move the file or fix the status`)
     }
-    if (data.updated && !/^\d{4}-\d{2}-\d{2}$/.test(data.updated)) {
+    if (data.updated && !isIsoDate(data.updated)) {
       add('date', path, 'updated', `"${data.updated}" is not an ISO date`)
     }
-    if (data.verified_on && !/^\d{4}-\d{2}-\d{2}$/.test(data.verified_on)) {
+    if (data.verified_on && !isIsoDate(data.verified_on)) {
       add('date', path, 'verified_on', `"${data.verified_on}" is not an ISO date`)
     }
 
@@ -175,7 +178,7 @@ export function checkDocs(root, config = loadConfig(root), options = {}) {
     // 8b. evidence entries are paths that exist, or commands.
     if (Array.isArray(data.evidence)) {
       for (const entry of data.evidence) {
-        const message = evidenceError(root, entry)
+        const message = evidenceError(root, entry, exists)
         if (message) add('evidence', path, 'evidence', message)
       }
     }
@@ -189,7 +192,7 @@ export function checkDocs(root, config = loadConfig(root), options = {}) {
     // 2b. `implements` is optional, but when present its file half must exist
     if (data.implements) {
       const target = data.implements.split('#')[0]
-      if (!existsSync(join(root, target))) {
+      if (!exists(target)) {
         add('implements', path, 'implements', `points at "${target}", which does not exist`)
       }
     }
@@ -197,7 +200,7 @@ export function checkDocs(root, config = loadConfig(root), options = {}) {
     // 6. superseded implies a live superseded_by
     if (data.status === 'superseded') {
       if (!data.superseded_by) add('superseded', path, 'superseded_by', 'required when status is `superseded`')
-      else if (!existsSync(join(root, data.superseded_by))) {
+      else if (!exists(data.superseded_by)) {
         add('superseded', path, 'superseded_by', `points at "${data.superseded_by}", which does not exist`)
       }
     }
@@ -317,12 +320,16 @@ function markdownLinks(body) {
  */
 export function trackedDocRefs(root, config = loadConfig(root)) {
   const dir = config.docsDir
-  const pattern = new RegExp(`${dir}/[A-Za-z0-9._\\-/]+\\.md`, 'g')
+  // The lookbehind is what keeps a URL from reading as a repository path:
+  // `.../blob/main/docs/x.md` is preceded by `/`, a local mention never is.
+  const pattern = new RegExp(`(?<![\\w./-])${dir}/[A-Za-z0-9._\\-/]+\\.md`, 'g')
   try {
     const out = execFileSync(
       'git',
       [
-        'grep', '-Ioh', '-E', `${dir}/[A-Za-z0-9._/-]+\\.md`, '--',
+        // Whole matching lines, not `-o` matches: the surrounding characters are
+        // exactly what `pattern` needs, so this stays a candidate filter only.
+        'grep', '-Ih', '-E', `${dir}/[A-Za-z0-9._/-]+\\.md`, '--',
         `:(exclude)${dir}`,
         ...config.referenceScanExclude.map((path) => `:(exclude)${path}`),
       ],

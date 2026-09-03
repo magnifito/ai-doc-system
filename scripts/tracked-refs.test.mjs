@@ -109,3 +109,17 @@ test('the exclusion list is configurable per project', () => {
     },
   )
 })
+
+test('a docs path inside a URL is not a reference to this repository', () => {
+  withGitFixture(
+    {
+      'CLAUDE.md': 'See https://github.com/magnifito/ai-doc-system/blob/main/docs/engineering/design.md and docs/engineering/local.md\n',
+      'docs/engineering/local.md': '---\ntitle: L\nkind: engineering\nstatus: active\nupdated: 2026-08-17\n---\n# L\n',
+    },
+    (root) => {
+      const refs = trackedDocRefs(root)
+      assert.ok(refs.has('docs/engineering/local.md'))
+      assert.ok(!refs.has('docs/engineering/design.md'))
+    },
+  )
+})

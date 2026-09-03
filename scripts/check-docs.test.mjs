@@ -557,3 +557,18 @@ test('11b. a rule set to off produces no violation; warn keeps it but demotes it
   const warn = run(files, { config: { rules: { implements: 'warn' } } })
   assert.ok(warn.some((v) => v.rule === 'implements' && v.severity === 'warn'))
 })
+
+test('2g. an impossible calendar date is rejected', () => {
+  const violations = run({ 'docs/engineering/x.md': doc({ title: 'X', kind: 'engineering', status: 'active', updated: '2026-13-45' }) })
+  assert.ok(violations.some((v) => v.rule === 'date' && v.field === 'updated'))
+})
+
+test('2h. implements, superseded_by and evidence resolve case-exactly', () => {
+  const violations = run({
+    'docs/product/target.md': doc({ title: 'T', kind: 'product', status: 'active', updated: '2026-08-17' }),
+    'docs/product/a.md': doc({ title: 'A', kind: 'product', status: 'active', updated: '2026-08-17', implements: 'docs/product/TARGET.md' }),
+    'docs/archive/b.md': doc({ title: 'B', kind: 'archive', status: 'superseded', updated: '2026-08-17', superseded_by: 'docs/product/Target.md' }),
+  })
+  assert.ok(violations.some((v) => v.field === 'implements'))
+  assert.ok(violations.some((v) => v.field === 'superseded_by'))
+})
