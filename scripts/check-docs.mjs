@@ -226,8 +226,14 @@ export function checkDocs(root, config = loadConfig(root), options = {}) {
         const parsed = locked[entry] ? parsePathEvidence(entry) : null
         if (!parsed) continue
         const current = hashEvidence(root, parsed)
-        if (current && current !== locked[entry]) {
-          add('evidence-lock', path, 'evidence', `"${entry}" changed since it was verified — run \`ai-doc-system verify --only ${path} --stamp\``)
+        const fix = `run \`ai-doc-system verify --only ${path} --stamp\``
+        // A null hash on a path the `evidence` check just passed means the file
+        // shrank past the named line. That is drift, not "nothing to compare" —
+        // reading it as the latter is how a claim outlives its evidence.
+        if (current === null) {
+          add('evidence-lock', path, 'evidence', `"${entry}" names a line past the end of the file since it was verified — ${fix}`)
+        } else if (current !== locked[entry]) {
+          add('evidence-lock', path, 'evidence', `"${entry}" changed since it was verified — ${fix}`)
         }
       }
     }

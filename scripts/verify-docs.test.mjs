@@ -183,3 +183,26 @@ test('--stamp on a block with no updated anchor writes verified_on under title, 
     rmSync(root, { recursive: true, force: true })
   }
 })
+
+test('the gate warns when a locked evidence line has vanished, not just when it changed', () => {
+  const root = gitFixture({
+    'docs-system.config.json': CONFIG,
+    'src/x.ts': 'line1\nline2\nline3\n',
+    'docs/modules/crm/state/s.md':
+      '---\ntitle: S\nkind: state\nmodule: crm\nstatus: active\nupdated: 2026-08-01\nverified_on: 2026-08-01\nevidence:\n  - src/x.ts:3\n---\n# S\n',
+  })
+  clearConfigCache()
+  try {
+    verifyDocs(root, {})
+    execFileSync(process.execPath, [join(PACKAGE_ROOT, 'scripts', 'gen-docs-index.mjs')], { cwd: root, stdio: 'pipe' })
+    assert.ok(!checkDocs(root).some((v) => v.rule === 'evidence-lock'))
+    writeFileSync(join(root, 'src/x.ts'), 'line1\nline2\n')
+    const hit = checkDocs(root).find((v) => v.rule === 'evidence-lock')
+    assert.ok(hit)
+    assert.equal(hit.severity, 'warn')
+    assert.match(hit.message, /past the end of the file/)
+  } finally {
+    clearConfigCache()
+    rmSync(root, { recursive: true, force: true })
+  }
+})
