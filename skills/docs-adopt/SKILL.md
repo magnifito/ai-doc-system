@@ -82,7 +82,7 @@ On the vendored route write the same four as `node scripts/check-docs.mjs`,
 `node scripts/check-docs-advisory.mjs`, `node scripts/gen-docs-index.mjs` and
 `node scripts/impact-docs.mjs`, plus a fifth: `"test:scripts": "node --test scripts/*.test.mjs"`.
 
-Run these as `npx ai-doc-system …` (npm install) or `node scripts/<name>.mjs` (vendored); a bare
+Run these as `npx ai-doc-system …` (npm install) or `node scripts/<script>.mjs` (vendored — the script names differ from the command names: `check` is `check-docs.mjs`, `new` is `new-doc.mjs`, `mv` is `mv-doc.mjs`, `gen` is `gen-docs-index.mjs`); a bare
 `ai-doc-system` is on PATH only inside an npm script.
 
 `lint:docs` goes in the blocking gate — cheap, so put it before the type checks. `lint:docs:advisory`

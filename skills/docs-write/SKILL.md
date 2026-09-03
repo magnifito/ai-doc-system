@@ -15,7 +15,7 @@ where most gate failures come from, so the file is created by a command, and the
 ai-doc-system new docs/<tier>/<name>.md --title "<Title>" --summary "<one line>"
 ```
 
-Run these as `npx ai-doc-system …` (npm install) or `node scripts/<name>.mjs` (vendored); a bare
+Run these as `npx ai-doc-system …` (npm install) or `node scripts/<script>.mjs` (vendored — the script names differ from the command names: `check` is `check-docs.mjs`, `new` is `new-doc.mjs`, `mv` is `mv-doc.mjs`, `gen` is `gen-docs-index.mjs`); a bare
 `ai-doc-system` is on PATH only inside an npm script.
 
 It derives `kind` from the path, takes the tier's forced status where the tier has one, else
@@ -54,7 +54,7 @@ asserted equal; `ai-doc-system fix` restamps them after a hand-made move), and `
 - **Write the prose for this product.** A document that restates someone else's assumptions is a
   `reference` document, whatever tier you put it in.
 - **Link relatively** (`../engineering/design.md`) — that is what renders. The gate resolves
-  relative links from the file, and root-relative `docs/…` from the repo root; both pass, only the
+  relative links from the file, and root-relative `<docsDir>/…` from the repo root; both pass, only the
   first opens. Either way it must exist case-exactly. It does not read the target's status — a link
   left pointing at a superseded document is yours to find.
 - **`updated:` is yours.** Bump it on a substantive edit. Nothing derives it from git, because the

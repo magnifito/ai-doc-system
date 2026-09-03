@@ -361,6 +361,28 @@ test('a capture and a promotion committed on one branch is clean, and still owes
   }
 })
 
+test('retiring a document into archive keeps its prose and owes no rewrite', () => {
+  const root = gitFixture({ 'README.md': '# Repo\n', 'docs/product/old.md': '---\ntitle: Old\nkind: product\nstatus: active\nupdated: 2026-08-17\n---\n# Old\n\nWhat the product did, kept word for word once it is retired.\n', 'docs/product/new.md': '---\ntitle: New\nkind: product\nstatus: active\nupdated: 2026-08-17\n---\n# New\n\nWhat the product does now.\n' })
+  const git = (...args) => execFileSync('git', args, { cwd: root, stdio: 'pipe' })
+  try {
+    regen(root)
+    commitAll(root)
+    git('branch', '-M', 'main')
+    git('checkout', '-qb', 'feature')
+
+    // The supersede sequence docs-promote prescribes: point at the successor,
+    // then move into archive. The prose is deliberately untouched.
+    const path = join(root, 'docs/product/old.md')
+    writeFileSync(path, readFileSync(path, 'utf8').replace('updated: 2026-08-17\n', 'updated: 2026-08-17\nsuperseded_by: docs/product/new.md\n'))
+    mvDoc(root, 'docs/product/old.md', 'docs/archive/old.md')
+    regen(root)
+
+    assert.deepEqual(promotionRules(checkDocs(root, undefined, { base: 'main' })), [])
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
 test('a promoted_from naming a path that existed nowhere is still reported, committed or not', () => {
   const root = gitFixture({ 'README.md': '# Repo\n', 'docs/engineering/seed.md': '---\ntitle: Seed\nkind: engineering\nstatus: active\nupdated: 2026-08-17\n---\n# Seed\n\nSomething for the tree to hold before the branch starts.\n', })
   const git = (...args) => execFileSync('git', args, { cwd: root, stdio: 'pipe' })

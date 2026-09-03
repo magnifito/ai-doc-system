@@ -13,7 +13,7 @@ change a rule's severity to get a green run.
 ai-doc-system check --json     # the same list, one object per violation, for a long run
 ```
 
-Run these as `npx ai-doc-system …` (npm install) or `node scripts/<name>.mjs` (vendored); a bare
+Run these as `npx ai-doc-system …` (npm install) or `node scripts/<script>.mjs` (vendored — the script names differ from the command names: `check` is `check-docs.mjs`, `new` is `new-doc.mjs`, `mv` is `mv-doc.mjs`, `gen` is `gen-docs-index.mjs`); a bare
 `ai-doc-system` is on PATH only inside an npm script.
 
 Errors exit 1 and end `[rule]`; warnings print in full, exit 0 unless the project raised them, and
@@ -23,7 +23,7 @@ id in `title=`. Under `--base <ref>` two more rules run against the branch's his
 
 Exit 2 is not a violation. It is a usage error — a `--base` that does not resolve in this checkout,
 a `--format` that is neither `text` nor `github`, or a value flag with nothing after it. Fix the
-command line; the tree has not been judged yet. A long run prints only the first 100 errors unless
+command line; no verdict was printed. A long run prints only the first 100 errors unless
 you pass `--all`.
 
 ## Remedies by rule id

@@ -18,7 +18,7 @@ promotes it. Promote it first, then **rewrite the prose to describe this product
 ai-doc-system mv docs/reference/<name>.md docs/product/<name>.md
 ```
 
-Run these as `npx ai-doc-system …` (npm install) or `node scripts/<name>.mjs` (vendored); a bare
+Run these as `npx ai-doc-system …` (npm install) or `node scripts/<script>.mjs` (vendored — the script names differ from the command names: `check` is `check-docs.mjs`, `new` is `new-doc.mjs`, `mv` is `mv-doc.mjs`, `gen` is `gen-docs-index.mjs`); a bare
 `ai-doc-system` is on PATH only inside an npm script.
 
 `mv` is `git mv` plus a restamp: it sets `kind` and `module` for the destination, and sets `status`
@@ -64,7 +64,8 @@ When a newer document replaces an older one:
 1. Set `superseded_by: docs/<tier>/<new-name>.md` on the old file. Leave `status` alone —
    `superseded` outside `archive/` is a `vocabulary` error.
 2. Move it: `ai-doc-system mv docs/<tier>/<old-name>.md docs/archive/<old-name>.md`. The
-   `archive/` tier forces `status: superseded`.
+   `archive/` tier forces `status: superseded`. The prose stays as it was — an archived document is
+   a record, and `check --base` owes it no rewrite.
 3. Fix every link that pointed at it — the gate will not catch these; `link` only fails a target
    that is missing.
 

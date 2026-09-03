@@ -16,7 +16,7 @@ ai-doc-system check                    # warnings: shipped-code, upstream, revie
 ai-doc-system impact --base <ref>      # documents whose claims cover the paths a change touched
 ```
 
-Run these as `npx ai-doc-system …` (npm install) or `node scripts/<name>.mjs` (vendored); a bare
+Run these as `npx ai-doc-system …` (npm install) or `node scripts/<script>.mjs` (vendored — the script names differ from the command names: `check` is `check-docs.mjs`, `new` is `new-doc.mjs`, `mv` is `mv-doc.mjs`, `gen` is `gen-docs-index.mjs`); a bare
 `ai-doc-system` is on PATH only inside an npm script.
 
 `advisory` and `impact` never block; `check` blocks only on its errors — the four warnings named

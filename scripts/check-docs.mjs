@@ -386,8 +386,12 @@ export function checkDocs(root, config = loadConfig(root), options = {}) {
       // authority. The prose to compare against is the origin at the merge
       // base; when the branch itself captured the origin there is no copy
       // there, so it is read from the last commit that held it. A capture and a
-      // promotion in one branch must still rewrite the prose.
-      if (data.promoted_from || crossedTier) {
+      // promotion in one branch must still rewrite the prose. A move INTO the
+      // archive tier is the one cross-tier move that keeps its prose on
+      // purpose: an archived document is a record of what was said, so the
+      // rewrite is not owed there — only the `promoted_from` trail is.
+      const archived = kindForPath(config, path) === 'archive'
+      if ((data.promoted_from || crossedTier) && !archived) {
         const priorSource = before ?? showLastInRange(root, baseSha, 'HEAD', originPath)
         const where = before === null ? 'before this branch moved it' : `at ${options.base}`
         if (priorSource !== null && parseFrontmatter(priorSource).body.trim() === body.trim()) {
