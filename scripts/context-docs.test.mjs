@@ -10,7 +10,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import test from 'node:test'
-import { renderContext, renderJsonl, sections, selectDocs } from './context-docs.mjs'
+import { parseArgs, renderContext, renderJsonl, sections, selectDocs } from './context-docs.mjs'
 import { renderIndex } from './gen-docs-index.mjs'
 import { DEFAULTS, withDerived } from './docs-config.mjs'
 
@@ -121,4 +121,31 @@ test('the authority line names the code for shipped and the replacement for supe
   } finally {
     rmSync(root, { recursive: true, force: true })
   }
+})
+
+test('sections closes a fence only on the marker that opened it', () => {
+  const body = '```md\n~~~\n# inside\n```\n\n# Outside\n\nB.\n'
+  assert.deepEqual(sections(body).map((s) => s.heading), ['', 'Outside'])
+})
+
+test('renderJsonl emits nothing at all when nothing was selected', () => {
+  const root = fixture({ 'docs/product/p.md': doc({ title: 'P', kind: 'product', status: 'active', updated: '2026-08-17' }) })
+  try {
+    assert.equal(renderJsonl(root, selectDocs(root, { kind: 'plan' })), '')
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('parseArgs rejects a value flag with no value and a non-numeric budget', () => {
+  assert.match(parseArgs(['--kind', '--status', 'active']).error, /--kind needs a value/)
+  assert.match(parseArgs(['--kind']).error, /--kind needs a value/)
+  assert.match(parseArgs(['--max-chars', 'lots']).error, /--max-chars/)
+  assert.match(parseArgs(['--max-chars', '0']).error, /--max-chars/)
+  assert.equal(parseArgs(['--max-chars', '500']).maxChars, 500)
+})
+
+test('parseArgs rejects a positional that is not a document path', () => {
+  assert.match(parseArgs(['context', 'docs/product']).error, /not a document path docs\/product/)
+  assert.deepEqual(parseArgs(['context', 'docs/product/p.md']).paths, ['docs/product/p.md'])
 })

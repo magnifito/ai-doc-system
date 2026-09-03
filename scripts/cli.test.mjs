@@ -360,3 +360,15 @@ test('context with a path that is not a document exits 2 and names it', () => {
     rmSync(root, { recursive: true, force: true })
   }
 })
+
+test('context with a positional that is not a document path exits 2', () => {
+  const root = gitFixture({ 'docs/product/p.md': '---\ntitle: P\nkind: product\nstatus: active\nupdated: 2026-08-27\n---\n\n# P\n' })
+  try {
+    const { status, stdout, stderr } = cliResult(['context', 'docs/product'], { cwd: root })
+    assert.equal(status, 2)
+    assert.match(stderr, /context: not a document path docs\/product/)
+    assert.equal(stdout, '')
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})

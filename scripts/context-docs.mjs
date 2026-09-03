@@ -93,10 +93,14 @@ export function renderContext(root, entries, { maxChars = Infinity } = {}) {
  */
 export function sections(body) {
   const out = [{ heading: '', level: 0, lines: [] }]
-  let inFence = false
+  // The marker that opened the current fence, so a `~~~` line inside a ``` block
+  // does not close it and leave the rest of the document reading as code.
+  let fence = null
   for (const line of body.split('\n')) {
-    if (/^\s*(```|~~~)/.test(line)) inFence = !inFence
-    const match = !inFence && line.match(/^(#{1,6})\s+(.+?)\s*#*\s*$/)
+    const marker = line.match(/^\s*(```|~~~)/)?.[1]
+    if (marker && !fence) fence = marker
+    else if (marker === fence) fence = null
+    const match = !fence && line.match(/^(#{1,6})\s+(.+?)\s*#*\s*$/)
     if (match) out.push({ heading: match[2], level: match[1].length, lines: [] })
     else out[out.length - 1].lines.push(line)
   }
@@ -122,7 +126,7 @@ export function renderJsonl(root, entries) {
     }
     for (const { heading, level, text } of sections(body)) lines.push(JSON.stringify({ ...base, heading, level, text }))
   }
-  return `${lines.join('\n')}\n`
+  return lines.length > 0 ? `${lines.join('\n')}\n` : ''
 }
 
 const USAGE = [
@@ -132,19 +136,27 @@ const USAGE = [
 
 const VALUE_FLAGS = { '--kind': 'kind', '--status': 'status', '--module': 'module', '--max-chars': 'maxChars' }
 
+/** Dispatched through `cli/cli.mjs`, argv still carries the leading command word. */
+const COMMAND_WORDS = ['context', 'export']
+
 /**
- * Positionals are document paths — recognised by the `.md` extension, so the
- * leading command word (`context`, when dispatched through `cli/cli.mjs`) and
- * a flag's value are never mistaken for one. An unrecognised flag is an error
- * rather than a silently ignored filter: a mistyped `--satus` that selected
- * everything would be the worst possible failure for this command.
+ * Positionals are document paths, `.md` and nothing else. Everything the caller
+ * did not mean — a mistyped `--satus`, a directory, a path with the extension
+ * dropped, a flag left without its value — is an error rather than a silently
+ * ignored filter: a filter that quietly disappears dumps the whole tree, which
+ * is the worst possible failure for a command that feeds a context window.
  */
-export function parseArgs(args) {
+export function parseArgs(argv) {
+  const args = COMMAND_WORDS.includes(argv[0]) ? argv.slice(1) : argv
   const options = { paths: [] }
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index]
     if (VALUE_FLAGS[arg]) {
-      options[VALUE_FLAGS[arg]] = args[index + 1]
+      const value = args[index + 1]
+      // `--kind --status active` would otherwise read as "kind is --status",
+      // which selects nothing and looks like an empty tree.
+      if (value === undefined || value.startsWith('--')) return { error: `${arg} needs a value` }
+      options[VALUE_FLAGS[arg]] = value
       index += 1
     } else if (arg === '--jsonl') {
       options.jsonl = true
@@ -152,7 +164,16 @@ export function parseArgs(args) {
       return { error: `unknown flag ${arg}` }
     } else if (arg.endsWith('.md')) {
       options.paths.push(arg)
+    } else {
+      // `docs/product/p` or a directory: dropped before, and the command then
+      // ignored the selection and dumped the whole tree.
+      return { error: `not a document path ${arg}` }
     }
+  }
+  if (options.maxChars !== undefined) {
+    const budget = Number(options.maxChars)
+    if (!Number.isFinite(budget) || budget < 1) return { error: '--max-chars needs a positive number' }
+    options.maxChars = budget
   }
   return options
 }
@@ -180,7 +201,7 @@ export function main() {
   }
   const entries = selectDocs(root, { kind, status, module: moduleKey, paths }, config)
   if (jsonl) process.stdout.write(renderJsonl(root, entries))
-  else process.stdout.write(renderContext(root, entries, { maxChars: maxChars ? Number(maxChars) : Infinity }))
+  else process.stdout.write(renderContext(root, entries, { maxChars: maxChars === undefined ? Infinity : maxChars }))
 }
 
 if (runDirect(import.meta.url)) main()
