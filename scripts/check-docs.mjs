@@ -36,7 +36,7 @@ import { EVIDENCE_PATH, LIST_FIELDS, SCALAR_FIELDS, parseFrontmatter } from './d
 import { loadConfig } from './docs-config.mjs'
 import { isIsoDate } from './docs-dates.mjs'
 import { isExempt, kindForPath, moduleForPath, pathHygieneErrors, reservedStatuses, statusForKind } from './docs-taxonomy.mjs'
-import { existsCaseExact, listDocs, repoRoot } from './docs-fs.mjs'
+import { existsCaseExact, listDocs, repoRoot, showAtRef } from './docs-fs.mjs'
 import { renderIndex } from './gen-docs-index.mjs'
 import { hashEvidence, parsePathEvidence, readLock } from './verify-docs.mjs'
 
@@ -61,10 +61,26 @@ function evidenceError(entry, exists, runners) {
 }
 
 /**
+ * The status graph. An edge is a move a document may make on its own: a
+ * reference can be picked up as a draft, a draft can be adopted, an adopted
+ * document ships or is sent back to draft, and anything can be superseded.
+ * `superseded` is terminal — a retired document is replaced, not revived.
+ * Statuses a project adds to the vocabulary are not in this map and are never
+ * checked; the gate has no opinion about a graph it was not given.
+ */
+export const TRANSITIONS = {
+  reference: ['draft', 'superseded'],
+  draft: ['active', 'superseded'],
+  active: ['shipped', 'superseded', 'draft'],
+  shipped: ['superseded'],
+  superseded: [],
+}
+
+/**
  * @param {string} root repo root
  * @param {object} [config] resolved configuration; loaded from `root` by default
- * @param {{base?: string, now?: Date}} [options] reserved for the git-aware and
- *   date-aware assertions; ignored here
+ * @param {{base?: string, now?: Date}} [options] `base` is a git ref the tree is
+ *   compared against — without it the git-aware assertions do not run at all
  * @returns {{rule: string, file: string, field: string, message: string, severity: string}[]}
  */
 export function checkDocs(root, config = loadConfig(root), options = {}) {
@@ -260,6 +276,36 @@ export function checkDocs(root, config = loadConfig(root), options = {}) {
       }
     }
 
+    if (options.base) {
+      // transition: the status at base, at this path or at promoted_from, must
+      // reach the status at head along an allowed edge. Statuses outside the
+      // default vocabulary belong to the project and are not checked.
+      const originPath = data.promoted_from ?? path
+      const before = showAtRef(root, options.base, originPath)
+      if (data.promoted_from && before === null) {
+        add('promoted-verbatim', path, 'promoted_from', `names ${data.promoted_from}, which did not exist at ${options.base}`)
+      }
+      // A promotion is a move. Both copies alive means the tree now claims the
+      // same material at two authority levels, and readers cannot tell which
+      // one binds.
+      if (data.promoted_from && exists(data.promoted_from)) {
+        add('promoted-verbatim', path, 'promoted_from', `names ${data.promoted_from}, which still exists — promotion is a move`)
+      }
+      if (before !== null) {
+        const prior = parseFrontmatter(before)
+        const from = prior.data.status
+        const to = data.status
+        if (from && to && from !== to && from in TRANSITIONS && to in TRANSITIONS && !TRANSITIONS[from].includes(to)) {
+          add('transition', path, 'status', `${from} -> ${to} is not an allowed transition — allowed from ${from}: ${TRANSITIONS[from].join(', ') || 'nothing'}`)
+        }
+        // Promotion without a rewrite is the failure the reference tier exists
+        // to prevent: someone else's prose, wearing this product's authority.
+        if (data.promoted_from && prior.body.trim() === body.trim()) {
+          add('promoted-verbatim', path, 'promoted_from', `body is identical to ${data.promoted_from} at ${options.base} — rewrite the prose to describe this product`)
+        }
+      }
+    }
+
     // shipped-code: the convention is that a shipped document points at its
     // implementation. A warning, not an error — a blocking rule invites
     // placeholder paths (design section 4.3).
@@ -429,7 +475,23 @@ function flagValue(name) {
 }
 
 export function main() {
-  const violations = checkDocs(repoRoot())
+  const root = repoRoot()
+  const base = flagValue('--base')
+  // A base that does not resolve is refused rather than ignored. On a shallow
+  // CI checkout `origin/main` is often not fetched, and quietly dropping the
+  // git-aware rules would report a green gate that checked less than it says.
+  if (base) {
+    try {
+      execFileSync('git', ['rev-parse', '--verify', '--quiet', base], {
+        cwd: root,
+        stdio: ['ignore', 'pipe', 'pipe'],
+      })
+    } catch {
+      console.error(`check-docs: base ref "${base}" does not resolve`)
+      process.exit(2)
+    }
+  }
+  const violations = checkDocs(root, undefined, { base })
   const cap = process.argv.includes('--all') ? Infinity : PRINT_CAP
   // Warnings are advisory: they are always printed in full and never decide the
   // exit code, so a `warn` rule can be adopted before it is enforced.

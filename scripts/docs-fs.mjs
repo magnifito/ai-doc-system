@@ -160,3 +160,21 @@ export function changedPaths(root, base) {
     return [...new Set([...git(['diff', '--name-only', '--cached']), ...untracked()])]
   }
 }
+
+/**
+ * File content at `ref:path`, or null when it did not exist there. Used by the
+ * git-aware assertions to read a document as it stood at the base ref: a
+ * missing path and an unresolvable ref are the same answer here, because the
+ * caller only asks "what was there before".
+ */
+export function showAtRef(root, ref, path) {
+  try {
+    return execFileSync('git', ['show', `${ref}:${path}`], {
+      cwd: root,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    })
+  } catch {
+    return null
+  }
+}

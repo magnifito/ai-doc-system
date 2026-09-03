@@ -286,3 +286,33 @@ test('verify with an --only that matches nothing exits 2 and says so', () => {
     rmSync(root, { recursive: true, force: true })
   }
 })
+
+test('check --base reports a backward status transition and exits 1', () => {
+  const root = committedGitFixture({
+    'docs/product/x.md': '---\ntitle: X\nkind: product\nstatus: shipped\nupdated: 2026-08-27\ncode: src/x.ts\n---\n\n# X\n',
+    'src/x.ts': 'x',
+  })
+  try {
+    writeFileSync(
+      join(root, 'docs/product/x.md'),
+      '---\ntitle: X\nkind: product\nstatus: draft\nupdated: 2026-08-27\n---\n\n# X\n',
+    )
+    const { status, stderr } = cliResult(['check', '--base', 'HEAD'], { cwd: root })
+    assert.equal(status, 1)
+    assert.match(stderr, /docs\/product\/x\.md:status — shipped -> draft is not an allowed transition/)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('check --base with a ref that does not resolve exits 2 rather than skipping the rules', () => {
+  const root = committedGitFixture({ 'docs/engineering/quality-gate.md': GOOD })
+  try {
+    cli(['gen'], { cwd: root })
+    const { status, stderr } = cliResult(['check', '--base', 'origin/nope'], { cwd: root })
+    assert.equal(status, 2)
+    assert.match(stderr, /check-docs: base ref "origin\/nope" does not resolve/)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
