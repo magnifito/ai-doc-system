@@ -7,11 +7,12 @@ CI on every push.
 humans. Both are generated — run `node scripts/gen-docs-index.mjs` after adding or moving a
 document; never hand-edit them.
 
-One tier is populated:
+Two tiers are populated:
 
 | Tier | What it holds |
 |---|---|
 | `engineering/` | How this system works and why — the design record with its rejected alternatives and known limitations. |
+| `plans/` | Work in flight — the debt and improvement backlog. |
 
 The agent-facing procedure lives at the repository root as [`SKILL.md`](../SKILL.md), because skill
 loaders require it there. Frontmatter, tiers and the gate's assertions are documented in

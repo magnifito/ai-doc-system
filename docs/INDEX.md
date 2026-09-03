@@ -2,10 +2,17 @@
 
 # Documentation index
 
-1 documents. Agents should read `docs/index.json` instead of this file.
+3 documents. Agents should read `docs/index.json` instead of this file.
 
 ## engineering (1)
 
 | Document | Status | Updated |
 |---|---|---|
 | [Design: a documentation system for agent-built repositories](engineering/design.md) | `active` | 2026-08-27 |
+
+## plan (2)
+
+| Document | Status | Updated |
+|---|---|---|
+| [Architecture round 2026-09: rule engine, impact, verify, hooks, transitions, context packs, and the debt backlog](plans/architecture-2026-09.md) | `active` | 2026-09-03 |
+| [Technical debt and improvement backlog](plans/debt.md) | `active` | 2026-09-03 |

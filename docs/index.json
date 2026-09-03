@@ -1,6 +1,6 @@
 {
   "generated": "scripts/gen-docs-index.mjs",
-  "count": 1,
+  "count": 3,
   "docs": [
     {
       "path": "docs/engineering/design.md",
@@ -8,6 +8,21 @@
       "kind": "engineering",
       "status": "active",
       "updated": "2026-08-27"
+    },
+    {
+      "path": "docs/plans/architecture-2026-09.md",
+      "title": "Architecture round 2026-09: rule engine, impact, verify, hooks, transitions, context packs, and the debt backlog",
+      "kind": "plan",
+      "status": "active",
+      "updated": "2026-09-03",
+      "implements": "docs/plans/debt.md"
+    },
+    {
+      "path": "docs/plans/debt.md",
+      "title": "Technical debt and improvement backlog",
+      "kind": "plan",
+      "status": "active",
+      "updated": "2026-09-03"
     }
   ]
 }
