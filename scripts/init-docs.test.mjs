@@ -55,6 +55,7 @@ test('init wires the scripts into the host package.json without clobbering', () 
     assert.equal(pkg.scripts['lint:docs'], 'my-own-command')
     assert.equal(pkg.scripts['gen:docs-index'], 'ai-doc-system gen')
     assert.equal(pkg.scripts['lint:docs:advisory'], 'ai-doc-system advisory')
+    assert.equal(pkg.scripts['docs:impact'], 'ai-doc-system impact')
   } finally {
     rmSync(root, { recursive: true, force: true })
   }

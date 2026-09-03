@@ -2,13 +2,19 @@
 
 # Documentation index
 
-3 documents. Agents should read `docs/index.json` instead of this file.
+4 documents. Agents should read `docs/index.json` instead of this file.
 
 ## engineering (1)
 
 | Document | Status | Updated | Summary |
 |---|---|---|---|
-| [Design: a documentation system for agent-built repositories](engineering/design.md) | `active` | 2026-08-27 | What the docs-by-authority system is, why each gate assertion exists, and how it is wired. |
+| [Design: a documentation system for agent-built repositories](engineering/design.md) | `active` | 2026-09-03 | What the docs-by-authority system is, why each gate assertion exists, and how it is wired. |
+
+## adr (1)
+
+| Document | Status | Updated | Summary |
+|---|---|---|---|
+| [ADR 0001: store kind in frontmatter as well as deriving it from the path](engineering/adr/0001-store-kind-in-frontmatter.md) | `active` | 2026-09-03 | Why `kind` is stored on every document as well as derived from its path, and what that costs. |
 
 ## plan (2)
 

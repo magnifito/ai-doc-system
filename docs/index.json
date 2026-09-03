@@ -1,14 +1,22 @@
 {
   "generated": "scripts/gen-docs-index.mjs",
-  "count": 3,
+  "count": 4,
   "docs": [
+    {
+      "path": "docs/engineering/adr/0001-store-kind-in-frontmatter.md",
+      "title": "ADR 0001: store kind in frontmatter as well as deriving it from the path",
+      "summary": "Why `kind` is stored on every document as well as derived from its path, and what that costs.",
+      "kind": "adr",
+      "status": "active",
+      "updated": "2026-09-03"
+    },
     {
       "path": "docs/engineering/design.md",
       "title": "Design: a documentation system for agent-built repositories",
       "summary": "What the docs-by-authority system is, why each gate assertion exists, and how it is wired.",
       "kind": "engineering",
       "status": "active",
-      "updated": "2026-08-27"
+      "updated": "2026-09-03"
     },
     {
       "path": "docs/plans/architecture-2026-09.md",

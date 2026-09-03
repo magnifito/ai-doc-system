@@ -12,6 +12,7 @@ Two tiers are populated:
 | Tier | What it holds |
 |---|---|
 | `engineering/` | How this system works and why — the design record with its rejected alternatives and known limitations. |
+| `engineering/adr/` | Architecture decision records (`kind: adr`), one per decision that was reversed or is worth defending later. |
 | `plans/` | Work in flight — the debt and improvement backlog. |
 
 The agent-facing procedure lives at the repository root as [`SKILL.md`](../SKILL.md), because skill

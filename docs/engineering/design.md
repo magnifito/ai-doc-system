@@ -3,7 +3,7 @@ title: "Design: a documentation system for agent-built repositories"
 summary: What the docs-by-authority system is, why each gate assertion exists, and how it is wired.
 kind: engineering
 status: active
-updated: 2026-08-27
+updated: 2026-09-03
 ---
 
 # Design: a documentation system for agent-built repositories
@@ -78,7 +78,7 @@ they are the questions to ask before applying this anywhere else.
 | Should doc hygiene be enforced? | **Yes — a blocking check in the push gate.** | A script, with tests, wired in as a documented exception. |
 | Which architecture? | **Tiered `docs/` with frontmatter and a generated index** (approach A of three). | Promotion between tiers is a `git mv`, so history survives. |
 
-The two rejected approaches, recorded so the trade-off stays reviewable:
+The rejected approaches, recorded so the trade-off stays reviewable:
 
 - **B — move reference docs out of `docs/` entirely** (separate tree or submodule). Cheaper: metadata
   applied to 93 files instead of 301. Rejected because promoting a reference document into a
@@ -88,6 +88,11 @@ The two rejected approaches, recorded so the trade-off stays reviewable:
   in the index exactly once and every indexed path exists. Genuinely useful against orphans and
   duplicates, and very cheap. Rejected because status stays invisible: an agent still cannot
   distinguish shipped from aspirational without reading prose, which is the original problem.
+- **D — frontmatter authoritative, path free.** Considered 2026-09-03, after `kind` became a stored
+  field. With `kind` stored, the path rule is what keeps the two in sync and gives humans a
+  browsable tree; dropping it would make a document's authority invisible in a directory listing
+  and would leave two sources of truth with no assertion between them. Rejected; the path stays the
+  derivation source and the stored field its mirror.
 
 ---
 
@@ -167,14 +172,8 @@ updated: 2026-05-29           # ISO date, required — see 4.6 for who maintains
 
 `kind` is **derived from the path and also stored** (§4.2), and the gate asserts the two agree.
 
-> **Reversal, 2026-08-23.** This section used to forbid a `kind:` field, on the argument that
-> storing a derived value duplicates what the path already says and buys one assertion class whose
-> only job is to check the duplication. That argument weighed the wrong cost. A document is
-> routinely read **outside its tree** — pasted into a conversation, handed to an agent as a blob,
-> opened from a search result — and in that setting a path-derived field is simply absent. The
-> document then cannot say what it is. Self-containment is worth one cheap assertion, and a
-> duplicate that is machine-checked on every push cannot drift. The price is that `git mv` alone no
-> longer re-tiers a file; `fix-docs-frontmatter.mjs` restamps a whole move in one command.
+The reversal that introduced the stored field is recorded in
+[engineering/adr/0001-store-kind-in-frontmatter.md](adr/0001-store-kind-in-frontmatter.md).
 
 Documents in `product/` or `plans/` may carry two additional fields:
 
@@ -182,6 +181,17 @@ Documents in `product/` or `plans/` may carry two additional fields:
 implements: docs/product/ROADMAP.md#6.4   # optional — what committed scope this serves
 code: apps/web/app/api/invoices/          # optional — omit while unbuilt
 ```
+
+Four more optional fields are validated when present, on any kind:
+
+- `summary` — one line, non-empty. It rides into `index.json` and into every context pack and
+  export record, so an agent can triage a document without opening it.
+- `source_url` — an `http(s)` URL naming where a captured document came from. Where a `reference`
+  document's authority actually ends is a link, not a memory.
+- `review_by` — an ISO date. Once it is in the past the gate warns (`review`): a document with an
+  expiry nobody honoured is the stale-claim failure with a date attached.
+- `promoted_from` — the document this one was promoted out of, written by `mv` on a cross-tier
+  move. With `--base` it is what lets the gate tell a promotion from a copy (§5.2).
 
 `implements` is optional everywhere — a requirement the migration cannot honestly derive for existing
 files would be stamped as a lie — but when present, its file half must exist (§5.2.2).
@@ -309,6 +319,44 @@ one.**
 
 ### 5.2 What it asserts
 
+Every violation carries a **rule id** and a severity. Errors fail the run; warnings are printed in
+full and never decide the exit code, so a rule can be adopted before it is enforced. A project
+changes any of it under `rules` in `docs-system.config.json` — `{"rules": {"shipped-code": "error",
+"upstream": "off"}}` — and `off` drops the rule entirely.
+
+| Rule | Default | Fires when |
+|---|---|---|
+| `frontmatter` | error | no `---` block, or one that is not valid YAML |
+| `required` | error | a required field is missing or empty (`title`, `status`, `updated`, `kind`, `module`, plus `requiredFields` per kind) |
+| `vocabulary` | error | a closed set is violated: `status`, `kind`/`module` against the path, a registered module, a scalar written as a list or map |
+| `date` | error | `updated`, `verified_on` or `review_by` is not an ISO date |
+| `path` | error | path hygiene — a non-kebab directory, or a basename that is neither kebab nor a declared sentinel/prefix |
+| `basename` | error | two documents in one tier (and module) share a basename |
+| `link` | error | a dead `.md` link inside the tree, or a dead docs path in a tracked file outside it |
+| `implements` | error | `implements` names a file that does not exist |
+| `superseded` | error | `status: superseded` without a `superseded_by`, or one that points at nothing |
+| `evidence` | error | an `evidence` entry is neither a live path nor a command starting with a known runner |
+| `changes` | error | a `changes` entry names a missing document, or one that is not kind `state` |
+| `source-url` | error | `source_url` is not an `http(s)` URL |
+| `summary` | error | `summary` is present but empty, or spans more than one line |
+| `index` | error | `INDEX.md` or `index.json` differs from what the generator would write |
+| `transition` | error | (`--base` only) a status moved along an edge the graph does not have |
+| `promoted-verbatim` | error | (`--base` only) a promotion that is a copy, an unrecorded cross-tier move, or prose nobody rewrote |
+| `evidence-lock` | warn | path evidence changed, or its line vanished, since `verify` hashed it |
+| `shipped-code` | warn | `status: shipped` with no `code:` naming the implementation |
+| `upstream` | warn | the `implements` target has a later `updated` than the document deriving from it |
+| `review` | warn | `review_by` is in the past |
+| `updated-drift` | warn | *(advisory pass only)* the file's last commit is later than its `updated` |
+| `code-pointer` | warn | *(advisory pass only)* a `code:` pointer no longer resolves |
+| `verification-drift` | warn | *(advisory pass only)* a `state` document's `code:` changed after its `verified_on` |
+
+The last three are reported by `check-docs-advisory.mjs` and are never evaluated by the gate;
+setting one to `off` silences that report block. `frontmatter: off` is the one severity change with
+a second effect: a document whose block is missing or unparseable is skipped by every other check,
+so turning the rule off silences the message without restoring the checks behind it.
+
+In detail:
+
 1. **Frontmatter present and parseable** on every `.md` under the docs tree, except the exempt files.
 2. **Closed vocabularies.** `status` is a member of its closed set; `title` and `updated` are present;
    `kind` (and `module`, when modules are declared) is present and agrees with what the path implies
@@ -359,6 +407,31 @@ one.**
    rule of assertion 3 stops the same name in two casings; this stops it verbatim — two `foo.md`
    in one tier is the duplicate-topic-tree defect coming back.
 
+**Two assertions need history, so they run only with `--base <ref>`.** The gate resolves the merge
+base of `<ref>` and `HEAD` once, judges only the documents this branch changed since that fork
+(uncommitted work included), and asks git for the renames across the span. A ref that does not
+resolve exits 2 rather than being ignored: on a shallow CI checkout `origin/main` is often not
+fetched, and silently dropping these two would report a green gate that checked less than it says.
+
+- `transition` — a document's `status` moved along an edge of the graph: `reference` → `draft` or
+  `superseded`; `draft` → `active` or `superseded`; `active` → `shipped`, `superseded` or back to
+  `draft`; `shipped` → `superseded`; `superseded` → nothing, because a retired document is replaced,
+  not revived. An unchanged status is always legal, and a status a project added to the vocabulary
+  is in no graph and is never checked.
+- `promoted-verbatim` — a promotion is a real promotion. It fires when `promoted_from` names a
+  document that did not exist at the base, when that document still exists in the tree (a copy, not
+  a move), when a cross-tier rename carries no `promoted_from` at all, and when the body is
+  identical to the origin's at the base. The last one is §6.2's mandatory prose rewrite, finally
+  checkable: promoting a captured document verbatim is how someone else's assumptions become your
+  requirements. `ai-doc-system mv` writes `promoted_from` on any cross-tier move, so the honest path
+  is also the easy one.
+
+**Four rules warn rather than block.** `shipped-code` wants `code:` on a shipped document (§4.3
+explains why it is not an error); `upstream` catches a document whose `implements` target moved on
+without it; `review` catches a `review_by` date that has passed; `evidence-lock` catches evidence
+that changed under a claim since `verify` hashed it (§5.7). None of them is a reason to refuse a
+commit — each is a thing to go and fix — and a project that disagrees promotes it in `rules`.
+
 ### 5.3 What it deliberately does not assert
 
 Each of these would generate noise rather than signal, and a gate that cries wolf gets bypassed:
@@ -372,6 +445,11 @@ Each of these would generate noise rather than signal, and a gate that cries wol
   a drift report names the files whose git date has moved past their frontmatter date, and blocking
   on it would punish every whitespace commit. The report is capped, because one tree-wide commit
   moves every date at once.
+
+And what is `warn` by default: `shipped-code`, `upstream`, `review`, `evidence-lock`, plus the
+git-based advisory reports (`updated-drift`, `code-pointer`, `verification-drift`). Each names a
+document worth fixing and none is caused by the change in front of it, which is the line between a
+warning and an error here.
 
 ### 5.4 Failure behaviour
 
@@ -389,6 +467,47 @@ which the host must install.
 Fixtures are throwaway trees. Most are not git repositories, which exercises the non-git fallback of
 the tracked-reference scan; a separate file builds real git fixtures, which is the only way to cover
 the `git grep` branch and its exclusion list.
+
+### 5.6 Impact
+
+`code:` and path-form `evidence` point from a document at code. Nothing pointed back, so a change to
+`apps/api/src/pipelines/` could falsify half a dozen documents with no way to find them short of
+grepping the tree for the path.
+
+The index therefore carries a reverse map: `by_code` in `index.json`, built from every `code:` field
+and every path-form `evidence` entry, sorted, one key per claimed path. `ai-doc-system impact` diffs
+the working tree (with `--base <ref>`, the merge base of that ref and `HEAD`) and prints the
+documents whose claims cover a changed path, with each document's `verified_on` where it has one —
+a claim that was verified on a date is exactly the claim a code change can falsify.
+
+It is advisory in the strongest sense: **exit 0 always**, including when `--base` does not resolve,
+because a checkout problem is not a docs problem and this pass has no business failing a build.
+When `GITHUB_STEP_SUMMARY` is set it appends its report there, so a pull request carries the list of
+documents it may have made untrue without anyone opening a log.
+
+### 5.7 Executable evidence
+
+`evidence` was form-checked and never run (§7, limitation 6). `ai-doc-system verify` closes the half of that gap
+which is mechanically closable, one document at a time (`--only <doc>`) or across the tree:
+
+- **Command-form entries are executed** — through the shell, from the repository root, with a 60-second
+  timeout and a 16 MiB output cap. A non-zero exit, a timeout or a signal is a failure, reported with
+  the first line of output.
+- **Path-form entries are hashed** — the named lines, or the whole file — into
+  `<docsDir>/evidence-lock.json`. A `:line` past the end of the file is a **failure**, not an empty
+  hash: hashing nothing is stable forever, and a claim that verifies forever is exactly the defect.
+- `--stamp` sets `verified_on: <today>` on every document whose entries all passed, and regenerates
+  the index so the gate stays green in the same command.
+
+The lock is what makes the gate's `evidence-lock` warning possible: on every later run the gate
+re-hashes the locked entries and warns when one differs or its line has vanished. The claim is not
+wrong — it is unverified — so it warns rather than blocks.
+
+**Security note.** `verify` is the only command in this system that executes anything written in a
+document, and evidence lines are ordinary text in ordinary files. It therefore runs **only when an
+author invokes it on purpose**: never from the gate, never from a hook, never from `check`. A
+repository that accepts documents from outside should treat `verify` the way it treats running the
+tests of a pull request — because that is what it is.
 
 ---
 
@@ -429,6 +548,51 @@ reference/   →   product/    →   plans/   →   plans/done/
 
 Cheap to obey, checkable at review time, and it is what turns a liability into an asset.
 
+### 6.4 Hooks
+
+A rule an agent has to remember is a rule it forgets. Installed as a Claude Code plugin, the package
+ships `hooks/hooks.json`, which the plugin loader discovers on its own, and two hooks put the two
+load-bearing rules where they cannot be skipped:
+
+- **Read time** (`PreToolUse` on `Read`). When the file about to be read is a document under the docs
+  tree whose `status` is `reference`, the hook adds one line of context: this is captured material
+  and not a commitment. §6.3's rule enforced one turn *before* an agent could act on the document,
+  rather than at review time.
+- **Edit time** (`PostToolUse` on `Write`, `Edit`, `MultiEdit`). When the file just written is a
+  document under the docs tree, the hook runs the gate and hands the violations back as context —
+  errors and warnings reported separately, so a pre-existing warning is never presented as something
+  this edit broke. The agent fixes the frontmatter or regenerates the index in the same turn instead
+  of at push time.
+
+Two properties keep them honest. The edit hook acts only in a tree that has **adopted** the system,
+proven by `<docsDir>/index.json`; without that guard any repository with a `docs/` folder would be
+told every file in it is missing frontmatter, because the configuration falls back to defaults. And
+**neither hook ever blocks**: both are wrapped so they exit 0 with nothing to say rather than
+interrupting a tool call with a stack trace. The blocking gate is `check`, in CI, where a human can
+see it.
+
+### 6.5 Context packs
+
+A document pasted into a conversation, or chunked into a RAG store, arrives without its path — and
+the path is where its authority lived. That is the original failure mode wearing a different hat.
+
+`ai-doc-system context` emits selected documents (filtered with `--kind`, `--status`, `--module`, or
+explicit paths, all ANDed) each preceded by a banner:
+
+```
+===== docs/reference/billing/dunning.md =====
+KIND: reference · STATUS: reference · UPDATED: 2026-05-29
+AUTHORITY: captured from elsewhere — NOT a commitment, never a build spec.
+```
+
+The `AUTHORITY` line is the whole point: it says what the status entitles a reader to *do* with the
+document, in a sentence that survives a copy-paste. `--max-chars N` keeps a pack inside a context
+budget, dropping whole documents rather than truncating one mid-sentence.
+
+`ai-doc-system export` is the same selection as JSONL, **one record per heading section**, with the
+frontmatter repeated on every record. A chunker that splits a document into twenty pieces would
+otherwise carry the status on the first piece only, and the other nineteen read as fact.
+
 ---
 
 ## 7. Known limitations
@@ -455,6 +619,8 @@ Stated so they are not mistaken for solved problems.
 6. **The evidence check validates form, not truth.** An entry starting with a known runner passes as
    a "command" whatever follows it; nothing executes it or verifies the claim. The check stops
    free prose, which is where unevidenced claims hide — it cannot stop a lie that names a real file.
+   Command-form evidence can now be executed with `verify` (§5.7); the check still cannot tell a
+   truthful command from a tautological one.
 
 ---
 

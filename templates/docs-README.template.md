@@ -29,16 +29,23 @@ Every `.md` under `docs/` carries a YAML block. The only exemptions are this fil
 
 ```yaml
 ---
-title: Recurring Invoices   # required
-kind: reference             # required — must equal what the path implies
-status: reference           # required — reference | draft | active | shipped | superseded
-updated: 2026-05-29         # required — ISO date, bumped by the author of a substantive edit
+title: Recurring Invoices              # required
+summary: How recurring invoices bill   # optional, one line — shown in the index
+kind: reference                        # required — must equal what the path implies
+status: reference                      # required — reference | draft | active | shipped | superseded
+updated: 2026-05-29                    # required — ISO date, bumped by the author of a substantive edit
 ---
 ```
 
-Optional: `implements:` (what committed scope a plan or product doc serves — its file half must
-exist), `code:` (where the implementation lives; omit while unbuilt). Required when
-`status: superseded`: `superseded_by:`, whose target must exist.
+Optional: `summary:` (one line, quoted if it contains a colon), `implements:` (what committed scope
+a plan or product doc serves — its file half must exist), `code:` (where the implementation lives;
+omit while unbuilt), `source_url:` (where a captured document came from), `review_by:` (an ISO date;
+once past, the gate warns). Required when `status: superseded`: `superseded_by:`, whose target must
+exist.
+
+Do not hand-write the block: `ai-doc-system new <path> --title "…" --summary "…"` writes a document
+that passes the gate on its first run, and `ai-doc-system mv <from> <to>` moves one between tiers,
+restamping `kind`/`status` and recording `promoted_from`. Both regenerate the index.
 
 `status: reference` is legal only under `reference/`, and everything under `reference/` must carry
 it. Everything under `archive/` must be `superseded`.
