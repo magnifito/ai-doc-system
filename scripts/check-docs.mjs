@@ -29,14 +29,14 @@
  * check-docs-advisory.mjs.
  */
 import { execFileSync } from 'node:child_process'
-import { existsSync, readFileSync, readdirSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { join, dirname, resolve, relative } from 'node:path'
 import { runDirect } from './docs-run.mjs'
 import { EVIDENCE_PATH, LIST_FIELDS, SCALAR_FIELDS, parseFrontmatter } from './docs-frontmatter.mjs'
 import { loadConfig } from './docs-config.mjs'
 import { isIsoDate } from './docs-dates.mjs'
 import { isExempt, kindForPath, moduleForPath, pathHygieneErrors, reservedStatuses, statusForKind } from './docs-taxonomy.mjs'
-import { listDocs, repoRoot } from './docs-fs.mjs'
+import { existsCaseExact, listDocs, repoRoot } from './docs-fs.mjs'
 import { renderIndex } from './gen-docs-index.mjs'
 import { hashEvidence, parsePathEvidence, readLock } from './verify-docs.mjs'
 
@@ -313,34 +313,6 @@ export function applySeverity(config, violations) {
     out.push({ ...violation, severity })
   }
   return out
-}
-
-/**
- * `existsSync` with the case checked, because macOS and Windows resolve
- * `./FOO.md` to `foo.md` and would report a link as live after the file was
- * renamed. The same tree then fails on Linux. EVERY segment is checked against
- * its parent's real listing — a wrong-case directory in the middle of a link
- * is the same defect as a wrong-case basename.
- */
-function existsCaseExact(root, repoRelative, listings = new Map()) {
-  if (!existsSync(join(root, repoRelative))) return false
-  let dir = root
-  for (const segment of repoRelative.split('/')) {
-    // One readdir per directory per run, not per link — `listings` is shared
-    // across every target checkDocs resolves.
-    let names = listings.get(dir)
-    if (!names) {
-      try {
-        names = new Set(readdirSync(dir))
-      } catch {
-        names = new Set()
-      }
-      listings.set(dir, names)
-    }
-    if (!names.has(segment)) return false
-    dir = join(dir, segment)
-  }
-  return true
 }
 
 /** The configured path prefix of a tier kind, for error messages. */

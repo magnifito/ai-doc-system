@@ -9,6 +9,34 @@ export function repoRoot() {
 }
 
 /**
+ * `existsSync` with the case checked, because macOS and Windows resolve
+ * `./FOO.md` to `foo.md` and would report a link as live after the file was
+ * renamed. The same tree then fails on Linux. EVERY segment is checked against
+ * its parent's real listing — a wrong-case directory in the middle of a link
+ * is the same defect as a wrong-case basename.
+ */
+export function existsCaseExact(root, repoRelative, listings = new Map()) {
+  if (!existsSync(join(root, repoRelative))) return false
+  let dir = root
+  for (const segment of repoRelative.split('/')) {
+    // One readdir per directory per run, not per link — `listings` is shared
+    // across every target checkDocs resolves.
+    let names = listings.get(dir)
+    if (!names) {
+      try {
+        names = new Set(readdirSync(dir))
+      } catch {
+        names = new Set()
+      }
+      listings.set(dir, names)
+    }
+    if (!names.has(segment)) return false
+    dir = join(dir, segment)
+  }
+  return true
+}
+
+/**
  * Every `.md` under the configured docs directory, repo-relative, POSIX, sorted.
  * Symlinks are not followed — a symlinked directory can cycle back into the
  * tree and hang the walk, and a linked document's real copy is walked anyway.

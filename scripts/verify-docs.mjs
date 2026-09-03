@@ -18,12 +18,19 @@ import { EVIDENCE_PATH, parseFrontmatter, patchScalar } from './docs-frontmatter
 import { loadConfig } from './docs-config.mjs'
 import { isExempt } from './docs-taxonomy.mjs'
 import { today } from './docs-dates.mjs'
-import { listDocs, repoRoot } from './docs-fs.mjs'
+import { existsCaseExact, listDocs, repoRoot } from './docs-fs.mjs'
+import { writeIndex } from './gen-docs-index.mjs'
 import { runDirect } from './docs-run.mjs'
 
 export const LOCK_FILE = 'evidence-lock.json'
 
 const GENERATED_BY = 'scripts/verify-docs.mjs'
+
+/** A check an author is waiting on has a minute; a hung one must not hold the terminal. */
+const TIMEOUT_MS = 60_000
+
+/** 16 MiB of captured output; the default 1 MiB is smaller than a chatty test run. */
+const MAX_OUTPUT = 1 << 24
 
 /**
  * Split `path[:from[-to]]`; null when the entry is not path-form.
@@ -41,7 +48,12 @@ export function parsePathEvidence(entry) {
   return { path: match[1].replace(/\/$/, ''), from: from ? Number(from) : null, to: to ? Number(to) : null }
 }
 
-/** sha256 of the named lines (1-based, inclusive) or of the whole file. Null when the path is missing or a directory. */
+/**
+ * sha256 of the named lines (1-based, inclusive) or of the whole file. Null when
+ * the path is missing, is a directory, or the first line named is out of range —
+ * `:0` and `:99` on a three-line file used to hash the empty string, which is a
+ * stable hash of nothing and would have reported the claim as verified forever.
+ */
 export function hashEvidence(root, { path, from, to }) {
   const full = join(root, path)
   if (!existsSync(full)) return null
@@ -53,6 +65,9 @@ export function hashEvidence(root, { path, from, to }) {
   }
   if (from !== null) {
     const lines = text.split('\n')
+    // A file ending in a newline splits to a trailing '' that is not a line.
+    const count = lines.length > 0 && lines.at(-1) === '' ? lines.length - 1 : lines.length
+    if (from < 1 || from > count) return null
     text = lines.slice(from - 1, to ?? from).join('\n')
   }
   return createHash('sha256').update(text).digest('hex')
@@ -66,16 +81,22 @@ export function readLock(root, config) {
 }
 
 /**
- * Run one command entry. `stdio: 'pipe'` keeps a chatty check out of the
- * report; the first line of stderr is what an author needs to see.
+ * Run one command entry. `stdio: 'pipe'` keeps a chatty check out of the report;
+ * the first line of stderr is what an author needs to see. A test suite easily
+ * prints more than the 1 MiB default buffer, and being killed for succeeding
+ * loudly would read as a failing claim, so the buffer is raised to 16 MiB and
+ * overflowing it is reported as itself rather than as a signal.
  */
 function runCommand(root, command) {
   try {
-    execSync(command, { cwd: root, stdio: 'pipe', timeout: 60_000 })
+    execSync(command, { cwd: root, stdio: 'pipe', timeout: TIMEOUT_MS, maxBuffer: MAX_OUTPUT })
     return { ok: true, detail: 'exit 0' }
   } catch (error) {
-    const code = error.status ?? 'signal'
-    return { ok: false, detail: `exit ${code}: ${`${error.stderr ?? error.message}`.split('\n')[0]}` }
+    if (error.code === 'ENOBUFS') return { ok: false, detail: `printed more than ${MAX_OUTPUT >> 20} MiB` }
+    if (error.killed) return { ok: false, detail: `timed out after ${TIMEOUT_MS / 1000} s` }
+    if (error.signal) return { ok: false, detail: `killed by ${error.signal}` }
+    const first = `${error.stderr ?? error.message}`.split('\n')[0].trim()
+    return { ok: false, detail: first ? `exit ${error.status}: ${first}` : `exit ${error.status}` }
   }
 }
 
@@ -83,14 +104,17 @@ function runCommand(root, command) {
  * @param {string} root repo root
  * @param {{only?: string, stamp?: boolean, now?: Date, run?: Function}} [options]
  * @param {object} [config] resolved configuration; loaded from `root` by default
- * @returns {{results: {doc: string, entry: string, kind: 'command'|'path', ok: boolean, detail: string}[], stamped: string[]}}
+ * @returns {{results: {doc: string, entry: string, kind: 'command'|'path', ok: boolean, detail: string}[], stamped: string[], matched: number}}
  */
 export function verifyDocs(root, { only, stamp = false, now, run = runCommand } = {}, config = loadConfig(root)) {
   const results = []
   const stamped = []
+  const listings = new Map()
   const lock = readLock(root, config)
+  let matched = 0
   for (const path of listDocs(root, config)) {
     if (isExempt(config, path) || (only && path !== only)) continue
+    matched += 1
     const source = readFileSync(join(root, path), 'utf8')
     const { data, raw, body } = parseFrontmatter(source)
     if (!Array.isArray(data.evidence) || data.evidence.length === 0) continue
@@ -105,10 +129,16 @@ export function verifyDocs(root, { only, stamp = false, now, run = runCommand } 
         continue
       }
       const parsed = parsePathEvidence(entry)
-      const hash = parsed ? hashEvidence(root, parsed) : null
-      const ok = parsed !== null && existsSync(join(root, parsed.path))
+      // Case-exact, like the gate: `./FOO.ts` must not verify against `foo.ts`
+      // on macOS and then fail the same tree on Linux.
+      const exists = parsed !== null && existsCaseExact(root, parsed.path, listings)
+      const hash = exists ? hashEvidence(root, parsed) : null
+      // A file that exists but whose named line does not is a stale claim, not
+      // a passing one — the line moved out from under the document.
+      const ok = exists && (parsed.from === null || hash !== null)
+      const detail = !exists ? 'missing' : ok ? (hash ? `sha256 ${hash.slice(0, 12)}` : 'exists') : `line ${parsed.from} is past end of file`
       if (ok && hash) hashes[entry] = hash
-      results.push({ doc: path, entry, kind: 'path', ok, detail: ok ? (hash ? `sha256 ${hash.slice(0, 12)}` : 'exists') : 'missing' })
+      results.push({ doc: path, entry, kind: 'path', ok, detail })
       allOk &&= ok
     }
     // A document with no hashable entries left carries no lock rows, so an
@@ -116,7 +146,7 @@ export function verifyDocs(root, { only, stamp = false, now, run = runCommand } 
     if (Object.keys(hashes).length > 0) lock.entries[path] = hashes
     else delete lock.entries[path]
     if (stamp && allOk) {
-      writeFileSync(join(root, path), `---\n${patchScalar(raw, 'verified_on', today(now), ['review_by', 'updated'])}\n---\n${body}`)
+      writeFileSync(join(root, path), `---\n${patchScalar(raw, 'verified_on', today(now), ['review_by', 'updated', 'title'])}\n---\n${body}`)
       stamped.push(path)
     }
   }
@@ -124,11 +154,17 @@ export function verifyDocs(root, { only, stamp = false, now, run = runCommand } 
   // `--only` still writes the whole file: the other documents' rows are read
   // back above and carried through untouched.
   const docsDir = join(root, config.docsDir)
-  if (existsSync(docsDir)) {
+  // `--only` that matched nothing verified nothing, so it has nothing to say
+  // about the lock. Rewriting it here would silently drop every other
+  // document's rows on a typo'd path.
+  if (matched > 0 && existsSync(docsDir)) {
     const sorted = Object.fromEntries(Object.keys(lock.entries).sort().map((key) => [key, lock.entries[key]]))
     writeFileSync(join(docsDir, LOCK_FILE), `${JSON.stringify({ generated: GENERATED_BY, entries: sorted }, null, 2)}\n`)
   }
-  return { results, stamped }
+  // `verified_on` is a field the index carries, so stamping it without
+  // regenerating would leave a previously clean tree failing assertion 4.
+  if (stamped.length > 0) writeIndex(root, config)
+  return { results, stamped, matched }
 }
 
 function flagValue(name) {
@@ -137,7 +173,12 @@ function flagValue(name) {
 }
 
 export function main() {
-  const { results, stamped } = verifyDocs(repoRoot(), { only: flagValue('--only'), stamp: process.argv.includes('--stamp') })
+  const only = flagValue('--only')
+  const { results, stamped, matched } = verifyDocs(repoRoot(), { only, stamp: process.argv.includes('--stamp') })
+  if (matched === 0 && only) {
+    console.error(`verify: no document matched --only ${only}`)
+    process.exit(2)
+  }
   const failed = results.filter((r) => !r.ok)
   for (const { doc, entry, ok, detail } of results) console.log(`${ok ? 'ok  ' : 'FAIL'} ${doc} — ${entry} (${detail})`)
   for (const doc of stamped) console.log(`stamped verified_on on ${doc}`)

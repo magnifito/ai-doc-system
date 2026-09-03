@@ -272,3 +272,17 @@ test('verify runs a document command and reports the tally', () => {
     rmSync(root, { recursive: true, force: true })
   }
 })
+
+test('verify with an --only that matches nothing exits 2 and says so', () => {
+  const root = gitFixture({
+    'docs/engineering/verified.md':
+      '---\ntitle: Verified\nkind: engineering\nstatus: active\nupdated: 2026-08-27\nevidence:\n  - node -e "process.exit(0)"\n---\n\n# Verified\n',
+  })
+  try {
+    const { status, stderr } = cliResult(['verify', '--only', 'docs/nowhere.md'], { cwd: root })
+    assert.equal(status, 2)
+    assert.match(stderr, /verify: no document matched --only docs\/nowhere\.md/)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})

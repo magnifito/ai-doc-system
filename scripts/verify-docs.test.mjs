@@ -74,7 +74,7 @@ test('verify reports a failing command and does not stamp', () => {
   try {
     const { results, stamped } = verifyDocs(root, { stamp: true })
     assert.equal(results[0].ok, false)
-    assert.match(results[0].detail, /exit 3/)
+    assert.equal(results[0].detail, 'exit 3') // no stderr, so no trailing separator
     assert.deepEqual(stamped, [])
   } finally {
     clearConfigCache()
@@ -98,6 +98,86 @@ test('the gate warns when a locked evidence line has changed', () => {
     const hit = checkDocs(root).find((v) => v.rule === 'evidence-lock')
     assert.ok(hit)
     assert.equal(hit.severity, 'warn')
+  } finally {
+    clearConfigCache()
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('--stamp leaves the index fresh — verified_on is a field the index carries', () => {
+  // Default configuration on purpose: this fixture has to be gate-clean before
+  // the stamp for the assertion after it to mean anything.
+  const root = gitFixture({
+    'src/x.ts': 'line1\nline2\nline3\n',
+    'docs/engineering/e.md':
+      '---\ntitle: E\nkind: engineering\nstatus: active\nupdated: 2026-08-01\nverified_on: 2026-08-01\nevidence:\n  - src/x.ts:2\n---\n# E\n',
+  })
+  clearConfigCache()
+  try {
+    execFileSync(process.execPath, [join(PACKAGE_ROOT, 'scripts', 'gen-docs-index.mjs')], { cwd: root, stdio: 'pipe' })
+    assert.deepEqual(checkDocs(root).filter((v) => v.rule === 'index'), [])
+    const { stamped } = verifyDocs(root, { stamp: true, now: new Date('2026-09-03T12:00:00Z') })
+    assert.deepEqual(stamped, ['docs/engineering/e.md'])
+    assert.match(readFileSync(join(root, 'docs/index.json'), 'utf8'), /2026-09-03/)
+    assert.deepEqual(checkDocs(root).filter((v) => v.rule === 'index'), [])
+  } finally {
+    clearConfigCache()
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('a :line past the end of the file, or line 0, fails rather than hashing nothing', () => {
+  const root = gitFixture({
+    'docs-system.config.json': CONFIG,
+    'src/x.ts': 'line1\nline2\nline3\n',
+    'docs/modules/crm/state/s.md':
+      '---\ntitle: S\nkind: state\nmodule: crm\nstatus: active\nupdated: 2026-08-01\nverified_on: 2026-08-01\nevidence:\n  - src/x.ts:99\n  - src/x.ts:0\n---\n# S\n',
+  })
+  clearConfigCache()
+  try {
+    const { results, stamped } = verifyDocs(root, { stamp: true })
+    assert.deepEqual(results.map((r) => r.ok), [false, false])
+    assert.match(results[0].detail, /past end of file/)
+    assert.match(results[1].detail, /past end of file/)
+    assert.deepEqual(stamped, [])
+    const lock = JSON.parse(readFileSync(join(root, 'docs/evidence-lock.json'), 'utf8'))
+    assert.equal(lock.entries['docs/modules/crm/state/s.md'], undefined)
+  } finally {
+    clearConfigCache()
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('--only matching nothing verifies nothing and leaves the lock alone', () => {
+  const root = gitFixture({
+    'docs-system.config.json': CONFIG,
+    'src/x.ts': 'line1\nline2\n',
+    'docs/modules/crm/state/s.md':
+      '---\ntitle: S\nkind: state\nmodule: crm\nstatus: active\nupdated: 2026-08-01\nverified_on: 2026-08-01\nevidence:\n  - src/x.ts:2\n---\n# S\n',
+  })
+  clearConfigCache()
+  try {
+    verifyDocs(root, {})
+    const before = readFileSync(join(root, 'docs/evidence-lock.json'), 'utf8')
+    const { results, stamped, matched } = verifyDocs(root, { only: 'docs/nowhere.md', stamp: true })
+    assert.deepEqual(results, [])
+    assert.deepEqual(stamped, [])
+    assert.equal(matched, 0)
+    assert.equal(readFileSync(join(root, 'docs/evidence-lock.json'), 'utf8'), before)
+  } finally {
+    clearConfigCache()
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('--stamp on a block with no updated anchor writes verified_on under title, not above it', () => {
+  const root = gitFixture({
+    'docs/engineering/e.md': '---\ntitle: E\nkind: engineering\nstatus: active\nevidence:\n  - node -e "process.exit(0)"\n---\n# E\n',
+  })
+  clearConfigCache()
+  try {
+    verifyDocs(root, { stamp: true, now: new Date('2026-09-03T12:00:00Z') })
+    assert.match(readFileSync(join(root, 'docs/engineering/e.md'), 'utf8'), /^---\ntitle: E\nverified_on: 2026-09-03\n/)
   } finally {
     clearConfigCache()
     rmSync(root, { recursive: true, force: true })
