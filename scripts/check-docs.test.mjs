@@ -707,3 +707,36 @@ test('14b. an evidence list of maps yields no by_code key, and no crash', () => 
     rmSync(root, { recursive: true, force: true })
   }
 })
+
+test('15a. a document whose implements target was updated after it is a warning', () => {
+  const violations = run({
+    'docs/product/roadmap.md': doc({ title: 'R', kind: 'product', status: 'active', updated: '2026-09-01' }),
+    'docs/plans/p.md': doc({ title: 'P', kind: 'plan', status: 'active', updated: '2026-08-01', implements: 'docs/product/roadmap.md' }),
+  })
+  const hit = violations.find((v) => v.rule === 'upstream')
+  assert.ok(hit)
+  assert.equal(hit.severity, 'warn')
+  assert.equal(hit.file, 'docs/plans/p.md')
+})
+
+test('15b. review_by in the past is a warning; in the future it is silent', () => {
+  const files = { 'docs/engineering/x.md': doc({ title: 'X', kind: 'engineering', status: 'active', updated: '2026-08-01', review_by: '2026-09-01' }) }
+  const root = fixture(files)
+  try {
+    assert.ok(checkDocs(root, undefined, { now: new Date('2026-09-03T00:00:00Z') }).some((v) => v.rule === 'review'))
+    assert.ok(!checkDocs(root, undefined, { now: new Date('2026-08-15T00:00:00Z') }).some((v) => v.rule === 'review'))
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('15c. with no options, `now` defaults to the real clock', () => {
+  const root = fixture({
+    'docs/engineering/x.md': doc({ title: 'X', kind: 'engineering', status: 'active', updated: '2026-08-01', review_by: '2999-01-01' }),
+  })
+  try {
+    assert.ok(!checkDocs(root).some((v) => v.rule === 'review'))
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})

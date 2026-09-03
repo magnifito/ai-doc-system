@@ -33,6 +33,13 @@
  *      a cross-tier move records `promoted_from` at all, and the body is not
  *      the origin's prose word for word
  *
+ * Two more are dependency staleness. They need no history and never block —
+ * they are `warn` by default, because a stale document is a thing to go fix,
+ * not a reason to refuse a commit:
+ *  12. `upstream` — a document's `implements` target carries an `updated` later
+ *      than the document's own, so the thing it derives from moved on without it
+ *  13. `review` — `review_by` is in the past
+ *
  * What it deliberately does NOT check — document age, prose style, whether
  * `code:` targets still exist, whether `updated:` matches git — is argued in
  * the design's section 5.3 (github.com/magnifito/ai-doc-system) and reported by
@@ -44,7 +51,7 @@ import { join, dirname, resolve, relative } from 'node:path'
 import { runDirect } from './docs-run.mjs'
 import { EVIDENCE_PATH, LIST_FIELDS, SCALAR_FIELDS, parseFrontmatter } from './docs-frontmatter.mjs'
 import { loadConfig } from './docs-config.mjs'
-import { isIsoDate } from './docs-dates.mjs'
+import { isIsoDate, today } from './docs-dates.mjs'
 import { isExempt, kindForPath, moduleForPath, pathHygieneErrors, reservedStatuses, statusForKind } from './docs-taxonomy.mjs'
 import { changedPaths, existsCaseExact, listDocs, mergeBase, refExists, renamedFrom, repoRoot, showAtRef } from './docs-fs.mjs'
 import { renderIndex } from './gen-docs-index.mjs'
@@ -96,6 +103,8 @@ export const TRANSITIONS = {
 export function checkDocs(root, config = loadConfig(root), options = {}) {
   const violations = []
   const changeTargets = []
+  const implementsPairs = []
+  const updatedByPath = new Map()
   const basenames = new Map()
   const listings = new Map()
   const exists = (target) => existsCaseExact(root, target, listings)
@@ -230,6 +239,11 @@ export function checkDocs(root, config = loadConfig(root), options = {}) {
     if (data.review_by && !isIsoDate(data.review_by)) {
       add('date', path, 'review_by', `"${data.review_by}" is not an ISO date`)
     }
+    // 13. review — the date the author picked has arrived. Strictly past, so a
+    // document reviewed today is not overdue on the day it was written.
+    if (data.review_by && isIsoDate(data.review_by) && data.review_by < today(options.now)) {
+      add('review', path, 'review_by', `${data.review_by} has passed — review the document and move or remove the date`)
+    }
 
     // 8. per-kind required fields. Which kind demands what is configuration,
     // not a constant here, so three repositories can share this script.
@@ -280,12 +294,17 @@ export function checkDocs(root, config = loadConfig(root), options = {}) {
       for (const target of data.changes) changeTargets.push({ path, target })
     }
 
+    // Every document's own `updated`, for the 12 pass below: the upstream half
+    // of a pair may be read after the document that names it.
+    updatedByPath.set(path, data.updated)
+
     // 2b. `implements` is optional, but when present its file half must exist
     if (data.implements) {
       const target = data.implements.split('#')[0]
       if (!exists(target)) {
         add('implements', path, 'implements', `points at "${target}", which does not exist`)
       }
+      implementsPairs.push({ path, target, updated: data.updated })
     }
 
     // 6. superseded implies a live superseded_by
@@ -368,6 +387,17 @@ export function checkDocs(root, config = loadConfig(root), options = {}) {
     const targetKind = kindForPath(config, target)
     if (targetKind !== 'state') {
       add('changes', path, 'changes', `points at "${target}", which is kind "${targetKind ?? 'none'}" — changes must name state documents`)
+    }
+  }
+
+  // 12, second pass. Both dates come from the tree, so this needs every
+  // document's `updated` and cannot run inside the loop. A target outside the
+  // docs tree has no `updated` to compare and is silently skipped; ISO dates
+  // sort lexically, which is why the comparison is a plain string one.
+  for (const { path, target, updated } of implementsPairs) {
+    const upstream = updatedByPath.get(target)
+    if (upstream && updated && isIsoDate(upstream) && isIsoDate(updated) && upstream > updated) {
+      add('upstream', path, 'updated', `${target} was updated ${upstream}, after this document (${updated}) — re-read it and bump updated`)
     }
   }
 
