@@ -165,6 +165,21 @@ node scripts/gen-docs-index.mjs && node scripts/check-docs.mjs
 rm docs-migration.map.mjs scripts/migrate-docs.mjs
 ```
 
+## It gates itself
+
+This repository runs its own gate on its own documentation, on every push, on Linux, macOS and
+Windows. `docs/` here is a real tiered tree: the design record lives in `engineering/`, the
+backlog and the implementation plans live in `plans/`, every file carries validated frontmatter,
+and `docs/index.json` is regenerated and byte-compared in CI. If the gate ever lets a defect
+through, it lets it through here first.
+
+That is not a slogan. During the 2026-09 refactor the gate failed the authors' own commits twice:
+once for a JSDoc example that named a docs path that does not exist (in a tracked file, which is
+exactly assertion 5b), and once for a CLI usage string that spelled a placeholder path as if it
+were real. Then it failed a third time, on the first draft of this very paragraph, which quoted
+the placeholder verbatim. All three were caught before the push landed, by the check this package
+ships. A tool that cannot survive its own rules has no business enforcing them on yours.
+
 ## Provenance
 
 Designed and first applied to a 301-document monorepo in August 2026, where 208 of those documents
