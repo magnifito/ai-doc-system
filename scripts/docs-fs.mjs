@@ -141,24 +141,80 @@ export function changedPaths(root, base) {
       .filter(Boolean)
   const untracked = () => git(['ls-files', '--others', '--exclude-standard'])
   if (base) {
-    try {
-      git(['rev-parse', '--verify', '--quiet', base])
-    } catch {
-      throw new Error(`base ref "${base}" does not resolve — fetch it or omit --base`)
-    }
-    let from = base
-    try {
-      from = git(['merge-base', base, 'HEAD'])[0] ?? base
-    } catch {
-      /* unrelated histories, or no HEAD: compare against the ref itself */
-    }
-    return git(['diff', '--name-only', from])
+    if (!refExists(root, base)) throw new Error(`base ref "${base}" does not resolve — fetch it or omit --base`)
+    return git(['diff', '--name-only', mergeBase(root, base)])
   }
   try {
     return [...new Set([...git(['diff', '--name-only', 'HEAD']), ...untracked()])]
   } catch {
     return [...new Set([...git(['diff', '--name-only', '--cached']), ...untracked()])]
   }
+}
+
+/** Whether `ref` resolves in this repository. */
+export function refExists(root, ref) {
+  try {
+    execFileSync('git', ['rev-parse', '--verify', '--quiet', ref], {
+      cwd: root,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    })
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
+ * The commit `base` and `HEAD` forked from, which is the only honest "before"
+ * for a branch: comparing against the TIP of `base` would attribute every
+ * commit landed there since the fork to this branch, and would keep reporting
+ * a violation for ever once the branch is merged. Falls back to the ref itself
+ * when there is no merge base — unrelated histories, or a repository with no
+ * `HEAD` yet.
+ */
+export function mergeBase(root, base) {
+  const rev = (args) =>
+    execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
+  try {
+    return rev(['merge-base', base, 'HEAD'])
+  } catch {
+    try {
+      return rev(['rev-parse', base])
+    } catch {
+      return base
+    }
+  }
+}
+
+/**
+ * Renames git detected between `ref` and the working tree, as
+ * `new path -> old path`. A document that moved without `promoted_from` is
+ * still a document with a history, and this is the only way to find it.
+ *
+ * `core.quotePath=false` for the same reason as `lastCommitDates`: the default
+ * C-quotes a non-ASCII path, which would then match no document.
+ */
+export function renamedFrom(root, ref) {
+  const renames = new Map()
+  let out
+  try {
+    out = execFileSync('git', ['-c', 'core.quotePath=false', 'diff', '--name-status', '-M', ref], {
+      cwd: root,
+      encoding: 'utf8',
+      maxBuffer: 1 << 28,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    })
+  } catch {
+    return renames
+  }
+  for (const line of out.split('\n')) {
+    if (!line.startsWith('R')) continue
+    // R<score>\t<old>\t<new>
+    const [, from, to] = line.split('\t')
+    if (from && to) renames.set(to, from)
+  }
+  return renames
 }
 
 /**

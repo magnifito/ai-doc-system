@@ -23,6 +23,16 @@
  *   9. no two documents in one tier (and module) share a basename — the naming
  *      rule stops the same name in two CASINGS; this stops it verbatim
  *
+ * Two more assertions need history, so they run ONLY with `--base <ref>`, and
+ * only over the documents this branch changed since it forked from that ref:
+ *  10. `transition` — a document's `status` moved along an allowed edge of
+ *      TRANSITIONS, compared against the document's origin at the merge base
+ *      (`promoted_from`, else a rename git detected, else its own path)
+ *  11. `promoted-verbatim` — a promotion is a real promotion: `promoted_from`
+ *      named a document that existed at the base and is gone from the tree now,
+ *      a cross-tier move records `promoted_from` at all, and the body is not
+ *      the origin's prose word for word
+ *
  * What it deliberately does NOT check — document age, prose style, whether
  * `code:` targets still exist, whether `updated:` matches git — is argued in
  * the design's section 5.3 (github.com/magnifito/ai-doc-system) and reported by
@@ -36,7 +46,7 @@ import { EVIDENCE_PATH, LIST_FIELDS, SCALAR_FIELDS, parseFrontmatter } from './d
 import { loadConfig } from './docs-config.mjs'
 import { isIsoDate } from './docs-dates.mjs'
 import { isExempt, kindForPath, moduleForPath, pathHygieneErrors, reservedStatuses, statusForKind } from './docs-taxonomy.mjs'
-import { existsCaseExact, listDocs, repoRoot, showAtRef } from './docs-fs.mjs'
+import { changedPaths, existsCaseExact, listDocs, mergeBase, refExists, renamedFrom, repoRoot, showAtRef } from './docs-fs.mjs'
 import { renderIndex } from './gen-docs-index.mjs'
 import { hashEvidence, parsePathEvidence, readLock } from './verify-docs.mjs'
 
@@ -94,6 +104,16 @@ export function checkDocs(root, config = loadConfig(root), options = {}) {
   // Read once: every document's lock rows come out of the same file. A repo
   // that has never run `verify` has no lock, and no `evidence-lock` warnings.
   const lock = readLock(root, config)
+  // The history-aware assertions resolve their ref ONCE, not once per document:
+  // the merge base (what this branch forked from), the set of documents this
+  // branch actually touched, and the renames git detected across that span.
+  const baseSha = options.base ? mergeBase(root, options.base) : null
+  // The branch's work is the diff from the fork PLUS what is not committed yet:
+  // the base diff covers tracked files only, and a promotion made a minute ago
+  // is still untracked — which is exactly when these rules have something
+  // useful to say.
+  const changed = options.base ? new Set([...changedPaths(root, options.base), ...changedPaths(root)]) : null
+  const renames = options.base ? renamedFrom(root, baseSha) : null
 
   for (const path of listDocs(root, config)) {
     // 3. path hygiene — the check that makes `Tracking & Attribution` unrepeatable
@@ -276,32 +296,44 @@ export function checkDocs(root, config = loadConfig(root), options = {}) {
       }
     }
 
-    if (options.base) {
-      // transition: the status at base, at this path or at promoted_from, must
-      // reach the status at head along an allowed edge. Statuses outside the
-      // default vocabulary belong to the project and are not checked.
-      const originPath = data.promoted_from ?? path
-      const before = showAtRef(root, options.base, originPath)
-      if (data.promoted_from && before === null) {
-        add('promoted-verbatim', path, 'promoted_from', `names ${data.promoted_from}, which did not exist at ${options.base}`)
-      }
-      // A promotion is a move. Both copies alive means the tree now claims the
-      // same material at two authority levels, and readers cannot tell which
-      // one binds.
-      if (data.promoted_from && exists(data.promoted_from)) {
-        add('promoted-verbatim', path, 'promoted_from', `names ${data.promoted_from}, which still exists — promotion is a move`)
+    // 10 and 11, history-aware. Only documents this branch changed are judged:
+    // a document untouched since the fork is base's business, not this branch's,
+    // and judging it would keep failing for ever after the branch merges.
+    if (options.base && changed.has(path)) {
+      // The origin this document came from: what it says (`promoted_from`),
+      // else what git saw (a rename), else itself.
+      const renamedOrigin = renames.get(path)
+      const originPath = data.promoted_from ?? renamedOrigin ?? path
+      const before = showAtRef(root, baseSha, originPath)
+      if (data.promoted_from) {
+        if (before === null) {
+          add('promoted-verbatim', path, 'promoted_from', `names ${data.promoted_from}, which did not exist at ${options.base}`)
+        }
+        // A promotion is a move. Both copies alive means the tree now claims the
+        // same material at two authority levels, and readers cannot tell which
+        // one binds.
+        if (exists(data.promoted_from)) {
+          add('promoted-verbatim', path, 'promoted_from', `names ${data.promoted_from}, which still exists — promotion is a move`)
+        }
+      } else if (renamedOrigin && kindForPath(config, renamedOrigin) !== kindForPath(config, path)) {
+        // Crossing a tier boundary IS promotion, whether or not the author
+        // called it that: the document's authority changed and the trail of
+        // where the prose came from has to survive the move.
+        add('promoted-verbatim', path, 'promoted_from', `moved from ${renamedOrigin} across tiers without promoted_from — add promoted_from: ${renamedOrigin}`)
       }
       if (before !== null) {
         const prior = parseFrontmatter(before)
         const from = prior.data.status
         const to = data.status
+        // Statuses outside the default vocabulary belong to the project and are
+        // not checked: the gate has no opinion about a graph it was not given.
         if (from && to && from !== to && from in TRANSITIONS && to in TRANSITIONS && !TRANSITIONS[from].includes(to)) {
           add('transition', path, 'status', `${from} -> ${to} is not an allowed transition — allowed from ${from}: ${TRANSITIONS[from].join(', ') || 'nothing'}`)
         }
         // Promotion without a rewrite is the failure the reference tier exists
         // to prevent: someone else's prose, wearing this product's authority.
-        if (data.promoted_from && prior.body.trim() === body.trim()) {
-          add('promoted-verbatim', path, 'promoted_from', `body is identical to ${data.promoted_from} at ${options.base} — rewrite the prose to describe this product`)
+        if (originPath !== path && prior.body.trim() === body.trim()) {
+          add('promoted-verbatim', path, 'promoted_from', `body is identical to ${originPath} at ${options.base} — rewrite the prose to describe this product`)
         }
       }
     }
@@ -480,16 +512,9 @@ export function main() {
   // A base that does not resolve is refused rather than ignored. On a shallow
   // CI checkout `origin/main` is often not fetched, and quietly dropping the
   // git-aware rules would report a green gate that checked less than it says.
-  if (base) {
-    try {
-      execFileSync('git', ['rev-parse', '--verify', '--quiet', base], {
-        cwd: root,
-        stdio: ['ignore', 'pipe', 'pipe'],
-      })
-    } catch {
-      console.error(`check-docs: base ref "${base}" does not resolve`)
-      process.exit(2)
-    }
+  if (base && !refExists(root, base)) {
+    console.error(`check-docs: base ref "${base}" does not resolve — fetch it or omit --base`)
+    process.exit(2)
   }
   const violations = checkDocs(root, undefined, { base })
   const cap = process.argv.includes('--all') ? Infinity : PRINT_CAP

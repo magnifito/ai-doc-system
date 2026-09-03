@@ -45,6 +45,10 @@ function commitAll(root) {
   execFileSync('git', ['commit', '-qm', 'index'], { cwd: root, stdio: 'pipe' })
 }
 
+/** The two history-aware rule ids, for assertions that expect none of them. */
+const promotionRules = (violations) =>
+  violations.filter((v) => v.rule === 'transition' || v.rule === 'promoted-verbatim')
+
 const fm = (status, extra = '') => `---\ntitle: X\nkind: product\nstatus: ${status}\nupdated: 2026-08-17\n${extra}---\n# X\n\nBody.\n`
 
 test('a forward transition passes, a backward one fails, and no --base means no check', () => {
@@ -81,7 +85,9 @@ test('a promoted document whose body is identical to its origin at base fails', 
       '---\ntitle: X\nkind: product\nstatus: draft\nupdated: 2026-09-03\npromoted_from: docs/reference/x.md\n---\n# X\n\nCompetitor prose.\n',
     )
     regen(root)
-    assert.ok(checkDocs(root, undefined, { base: 'HEAD' }).some((v) => v.rule === 'promoted-verbatim'))
+    const hit = checkDocs(root, undefined, { base: 'HEAD' }).find((v) => v.rule === 'promoted-verbatim')
+    assert.ok(hit)
+    assert.match(hit.message, /body is identical/)
     writeFileSync(
       join(root, 'docs/product/x.md'),
       '---\ntitle: X\nkind: product\nstatus: draft\nupdated: 2026-09-03\npromoted_from: docs/reference/x.md\n---\n# X\n\nOur prose.\n',
@@ -141,6 +147,112 @@ test('a promotion that left the origin in place is a copy, not a move, and fails
     const hit = checkDocs(root, undefined, { base: 'HEAD' }).find((v) => v.rule === 'promoted-verbatim')
     assert.ok(hit)
     assert.match(hit.message, /names docs\/reference\/x\.md, which still exists — promotion is a move/)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('a correct promotion stays clean at the fork point and after later commits', () => {
+  const root = gitFixture({
+    'docs/reference/x.md': '---\ntitle: X\nkind: reference\nstatus: reference\nupdated: 2026-08-17\n---\n# X\n\nTheirs.\n',
+  })
+  try {
+    regen(root)
+    commitAll(root)
+    const fork = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim()
+    mkdirSync(join(root, 'docs/product'), { recursive: true })
+    execFileSync('git', ['mv', 'docs/reference/x.md', 'docs/product/x.md'], { cwd: root, stdio: 'pipe' })
+    writeFileSync(
+      join(root, 'docs/product/x.md'),
+      '---\ntitle: X\nkind: product\nstatus: draft\nupdated: 2026-09-03\npromoted_from: docs/reference/x.md\n---\n# X\n\nOurs.\n',
+    )
+    regen(root)
+    assert.deepEqual(promotionRules(checkDocs(root, undefined, { base: fork })), [])
+    // The promotion is history now. A later, unrelated commit must not make the
+    // gate re-judge it — that is the failure that never clears.
+    commitAll(root)
+    writeFileSync(join(root, 'README.md'), '# Later\n')
+    commitAll(root)
+    assert.deepEqual(promotionRules(checkDocs(root, undefined, { base: 'HEAD' })), [])
+    assert.deepEqual(promotionRules(checkDocs(root, undefined, { base: fork })), [])
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('a status moved on base after the fork is not this branch\'s transition', () => {
+  const root = gitFixture({ 'docs/product/x.md': fm('shipped'), 'src/a.ts': 'a\n' })
+  try {
+    regen(root)
+    commitAll(root)
+    const git = (...args) => execFileSync('git', args, { cwd: root, stdio: 'pipe' })
+    git('branch', '-M', 'main')
+    git('checkout', '-qb', 'feature')
+    // main moves on without this branch: shipped -> superseded over there.
+    git('checkout', '-q', 'main')
+    writeFileSync(join(root, 'docs/product/x.md'), fm('superseded', 'superseded_by: docs/product/x.md\n'))
+    regen(root)
+    commitAll(root)
+    // The branch touched something else entirely.
+    git('checkout', '-q', 'feature')
+    writeFileSync(join(root, 'src/a.ts'), 'b\n')
+    const violations = checkDocs(root, undefined, { base: 'main' })
+    assert.deepEqual(violations.filter((v) => v.rule === 'transition'), [])
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('a cross-tier move without promoted_from is still a promotion', () => {
+  const root = gitFixture({
+    'docs/reference/x.md': '---\ntitle: X\nkind: reference\nstatus: reference\nupdated: 2026-08-17\n---\n# X\n\nTheirs, at length: a competitor page, copied into the reference tier so the\nteam can read it without pretending it is ours. Several sentences of it,\nbecause a real reference document is never one line long.\n',
+  })
+  try {
+    regen(root)
+    commitAll(root)
+    mkdirSync(join(root, 'docs/product'), { recursive: true })
+    execFileSync('git', ['mv', 'docs/reference/x.md', 'docs/product/x.md'], { cwd: root, stdio: 'pipe' })
+    writeFileSync(
+      join(root, 'docs/product/x.md'),
+      '---\ntitle: X\nkind: product\nstatus: shipped\nupdated: 2026-09-03\n---\n# X\n\nTheirs, at length: a competitor page, copied into the reference tier so the\nteam can read it without pretending it is ours. Several sentences of it,\nbecause a real reference document is never one line long.\n',
+    )
+    regen(root)
+    const violations = checkDocs(root, undefined, { base: 'HEAD' })
+    const promotion = violations.filter((v) => v.rule === 'promoted-verbatim')
+    assert.ok(promotion.some((v) => /moved from docs\/reference\/x\.md across tiers without promoted_from/.test(v.message)))
+    assert.ok(promotion.some((v) => /body is identical/.test(v.message)))
+    assert.ok(violations.some((v) => v.rule === 'transition' && /reference -> shipped/.test(v.message)))
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('a document edited without changing status is not a transition', () => {
+  const root = gitFixture({ 'docs/product/x.md': fm('shipped') })
+  try {
+    regen(root)
+    commitAll(root)
+    writeFileSync(join(root, 'docs/product/x.md'), `${fm('shipped')}\nA further paragraph.\n`)
+    regen(root)
+    assert.deepEqual(checkDocs(root, undefined, { base: 'HEAD' }).filter((v) => v.rule === 'transition'), [])
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('a status the project added to the vocabulary is never checked', () => {
+  const root = gitFixture({
+    'docs-system.config.json': JSON.stringify({ 'statuses+': ['proposed'] }),
+    'docs/product/x.md': fm('shipped'),
+  })
+  try {
+    regen(root)
+    commitAll(root)
+    // `shipped -> anything but superseded` is refused for the statuses the gate
+    // owns; `proposed` is the project's, and the gate has no graph for it.
+    writeFileSync(join(root, 'docs/product/x.md'), fm('proposed'))
+    regen(root)
+    assert.deepEqual(checkDocs(root, undefined, { base: 'HEAD' }).filter((v) => v.rule === 'transition'), [])
   } finally {
     rmSync(root, { recursive: true, force: true })
   }
