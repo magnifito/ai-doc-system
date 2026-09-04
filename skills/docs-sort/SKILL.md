@@ -1,6 +1,6 @@
 ---
 name: docs-sort
-description: Use when documents in a repository with docs/index.json sit in the wrong place or carry no frontmatter — a file another skill or agent wrote under docs/superpowers/, docs/specs/, or any path under no tier; docs-notary check reporting "frontmatter — missing" on it; an untagged document the index does not list; a batch of documents to file by authority. Not for changing the tier or status of a document already in the tree (docs-promote), a red gate for any other rule (docs-gate), or a tree with no docs/index.json (docs-adopt).
+description: Use when documents in a repository with docs/index.json sit in the wrong place or carry no frontmatter — a file another skill or agent wrote under docs/superpowers/ or any path under no tier, a "frontmatter — missing" gate error, an untagged document the index does not list. Not for a document already in the tree that needs a new tier or status (docs-promote).
 ---
 
 # Sort stray documents

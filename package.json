@@ -1,6 +1,6 @@
 {
   "name": "@puralex/docs-notary",
-  "version": "1.5.1",
+  "version": "1.5.2",
   "description": "Tier a repository's docs by authority, validate frontmatter, generate an agent-readable index, and enforce it with a blocking gate.",
   "keywords": [
     "documentation",

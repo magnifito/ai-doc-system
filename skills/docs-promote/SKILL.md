@@ -1,6 +1,6 @@
 ---
 name: docs-promote
-description: Use when a document in a repository with docs/index.json must change authority or place — promote a captured reference document into product or engineering scope, move a file between tiers, take a plan from draft to active to shipped, supersede a document with a newer one, or retire one to archive. Drives docs-notary mv and the status transition rules that check --base enforces, and insists on the prose rewrite no command can do. Not for a stray with no frontmatter (docs-sort) or a red gate (docs-gate).
+description: Use when a document in a repository with docs/index.json must change authority or place — promote a reference document into product or engineering scope, move a file between tiers, take a plan from draft to active to shipped, supersede or archive one. Not for a stray with no frontmatter (docs-sort) or a red gate (docs-gate).
 ---
 
 # Promote, move, or retire a document

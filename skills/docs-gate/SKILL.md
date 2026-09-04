@@ -1,6 +1,6 @@
 ---
 name: docs-gate
-description: Use when docs-notary check fails — "check-docs FAILED", a GitHub annotation from check --format github, the plugin's edit hook reporting errors after a Write or Edit, or CI red on lint:docs. Reads the rule id in brackets, applies the one remedy that fixes the cause, and never silences a rule to make CI pass. Not for sorting a stray with no frontmatter (docs-sort), moving (docs-promote) or reviewing (docs-audit) documents.
+description: Use when docs-notary check fails — "check-docs FAILED", a GitHub annotation from check --format github, the plugin's edit hook reporting errors after a Write or Edit, or CI red on lint:docs. Not for a stray with no frontmatter (docs-sort), moving (docs-promote) or reviewing (docs-audit).
 ---
 
 # Fix a red gate

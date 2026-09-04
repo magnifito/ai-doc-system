@@ -1,6 +1,6 @@
 ---
 name: docs-adopt
-description: Use when a repository has no docs/index.json and its docs tree is unnavigable, misleading, or unenforced — an agent cannot tell whether a document describes something the product has, has committed to, or will never build. Surveys the tree, asks the four questions, installs @puralex/docs-notary, writes the migration map, tiers every document by authority, stamps validated frontmatter, generates the agent-readable index, and wires the blocking gate into CI. Not for a tree that already has docs/index.json — use docs-sort, docs-promote, docs-audit or docs-gate there.
+description: Use when a repository has no docs/index.json — its docs tree is unnavigable, misleading or unenforced, and an agent cannot tell whether a document describes something built, committed, or never to be built. Covers first-time setup and the migration of an existing tree. Not for a tree that already has docs/index.json (docs-sort, docs-promote, docs-audit, docs-gate).
 ---
 
 # Adopt the documentation system

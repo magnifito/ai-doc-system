@@ -1,6 +1,6 @@
 ---
 name: docs-audit
-description: Use when a repository with docs/index.json needs judgement about what its documents still claim — a periodic docs review, "are these docs stale", a plan that says it is done, a state document nobody has verified, a review_by date that passed, a change that may have invalidated documents, or a decision about what to archive. Runs docs-notary advisory, verify, and impact, and turns their output into archive, restamp, or rewrite actions. Not for sorting a stray (docs-sort), moving a document (docs-promote) or a red gate (docs-gate).
+description: Use when a repository with docs/index.json needs judgement about what its documents still claim — a periodic docs review, "are these docs stale", a plan that says it is done, an unverified state document, a review_by date that passed, a change that may have invalidated documents. Not for sorting (docs-sort), moving (docs-promote) or a red gate (docs-gate).
 ---
 
 # Audit the documents
