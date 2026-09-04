@@ -61,7 +61,7 @@ try {
           .map((v) => `${v.file}:${v.field} — ${v.message} [${v.rule}, ${v.severity}]`)
         const hint =
           errors.length > 0
-            ? 'Fix frontmatter, or run `ai-doc-system gen` if the index is stale.'
+            ? 'Fix frontmatter, or run `docs-notary gen` if the index is stale.'
             : 'Warnings do not block the gate.'
         const context = `check-docs found ${errors.length} error(s) and ${warnings.length} warning(s) after this edit:\n${lines.join('\n')}${violations.length > CAP ? '\n…' : ''}\n${hint}`
         process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: 'PostToolUse', additionalContext: context } }))

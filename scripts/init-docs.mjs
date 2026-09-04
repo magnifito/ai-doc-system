@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * `ai-doc-system init` — give a repository a gated docs tree in one command.
+ * `docs-notary init` — give a repository a gated docs tree in one command.
  *
  * The greenfield path, next to the migration's brownfield path: creates the
  * hand-written docs/README.md contract, wires the package.json scripts, and
@@ -34,19 +34,19 @@ Every \`.md\` here carries YAML frontmatter (\`title\`, \`kind\`, \`status\`, \`
 optional one-line \`summary\`); the \`lint:docs\` script is the blocking gate that keeps all of it
 true.
 
-Do not hand-write that block. \`ai-doc-system new <path> --title "…" --summary "…"\` writes a
-document that passes the gate on its first run, and \`ai-doc-system mv <from> <to>\` moves one
+Do not hand-write that block. \`docs-notary new <path> --title "…" --summary "…"\` writes a
+document that passes the gate on its first run, and \`docs-notary mv <from> <to>\` moves one
 between tiers — restamping \`kind\` and \`status\`, recording \`promoted_from\`. Both regenerate the
 index.
 
-This tree is managed by [ai-doc-system](https://github.com/magnifito/ai-doc-system).
+This tree is managed by [docs-notary](https://github.com/magnifito/docs-notary).
 `
 
 const SCRIPTS = {
-  'lint:docs': 'ai-doc-system check',
-  'lint:docs:advisory': 'ai-doc-system advisory',
-  'gen:docs-index': 'ai-doc-system gen',
-  'docs:impact': 'ai-doc-system impact',
+  'lint:docs': 'docs-notary check',
+  'lint:docs:advisory': 'docs-notary advisory',
+  'gen:docs-index': 'docs-notary gen',
+  'docs:impact': 'docs-notary impact',
 }
 
 export function initDocs(root, config = loadConfig(root)) {

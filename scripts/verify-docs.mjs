@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * `ai-doc-system verify [--only <doc>] [--stamp]` — turn evidence from a claim
+ * `docs-notary verify [--only <doc>] [--stamp]` — turn evidence from a claim
  * into a check. Command-form entries are RUN (shell, from the repo root, 60 s
  * timeout); path-form entries are hashed — the named lines, or the whole file —
  * into `<docsDir>/evidence-lock.json` so the gate can later warn when the
@@ -97,7 +97,7 @@ export function readLock(root, config) {
 }
 
 /** The tail of the unreadable-lock message; the gate prefixes the path itself. */
-export const LOCK_UNREADABLE = 'is not valid JSON — delete it and re-run `ai-doc-system verify`'
+export const LOCK_UNREADABLE = 'is not valid JSON — delete it and re-run `docs-notary verify`'
 
 /**
  * Run one command entry. `stdio: 'pipe'` keeps a chatty check out of the report;

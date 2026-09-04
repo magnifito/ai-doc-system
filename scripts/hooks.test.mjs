@@ -180,14 +180,14 @@ function pluginCheckout() {
 
 /**
  * A host repository with this package installed the way npm would leave it:
- * `node_modules/@puralex/ai-doc-system` pointing at the real package root, so
+ * `node_modules/@puralex/docs-notary` pointing at the real package root, so
  * the engine the hook finds is the one the host's own gate runs. `junction` is
  * the type Windows can create without elevation and POSIX ignores.
  */
 function installedFixture(files, options) {
   const root = gitFixture(files, options)
   mkdirSync(join(root, 'node_modules', '@puralex'), { recursive: true })
-  symlinkSync(PACKAGE_ROOT, join(root, 'node_modules', '@puralex', 'ai-doc-system'), 'junction')
+  symlinkSync(PACKAGE_ROOT, join(root, 'node_modules', '@puralex', 'docs-notary'), 'junction')
   return root
 }
 

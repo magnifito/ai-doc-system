@@ -8,7 +8,7 @@
 
 | Document | Status | Updated | Summary |
 |---|---|---|---|
-| [Design: a documentation system for agent-built repositories](engineering/design.md) | `active` | 2026-09-03 | What the docs-by-authority system is, why each gate assertion exists, and how it is wired. |
+| [Design: a documentation system for agent-built repositories](engineering/design.md) | `active` | 2026-09-04 | What the docs-by-authority system is, why each gate assertion exists, and how it is wired. |
 
 ## adr (1)
 

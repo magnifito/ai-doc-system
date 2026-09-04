@@ -1,6 +1,6 @@
 /**
  * Tests for the package CLI (`cli/cli.mjs`) — the entry point npm consumers
- * run as `npx ai-doc-system <command>`. Driven through child processes, which
+ * run as `npx docs-notary <command>`. Driven through child processes, which
  * also proves the scripts' run-direct guards fire only when intended.
  *
  * Run: node --test scripts/cli.test.mjs
@@ -344,7 +344,7 @@ test('context with an unknown flag exits 2 with usage', () => {
   try {
     const { status, stderr } = cliResult(['context', '--nope'], { cwd: root })
     assert.equal(status, 2)
-    assert.match(stderr, /usage: ai-doc-system context/)
+    assert.match(stderr, /usage: docs-notary context/)
   } finally {
     rmSync(root, { recursive: true, force: true })
   }
@@ -443,7 +443,7 @@ test('a corrupt evidence lock stops verify and only warns the gate', () => {
     // every row in it, including rows for documents this run does not touch.
     const verify = cliResult(['verify'], { cwd: root })
     assert.equal(verify.status, 1)
-    assert.match(verify.stderr, /verify: docs\/evidence-lock\.json is not valid JSON — delete it and re-run `ai-doc-system verify`/)
+    assert.match(verify.stderr, /verify: docs\/evidence-lock\.json is not valid JSON — delete it and re-run `docs-notary verify`/)
     assert.equal(readFileSync(join(root, 'docs/evidence-lock.json'), 'utf8'), conflicted)
     // The gate reports it and, at the default severity, still passes.
     const check = cliResult(['check'], { cwd: root })

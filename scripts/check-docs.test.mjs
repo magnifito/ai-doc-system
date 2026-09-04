@@ -7,7 +7,7 @@
  * Run: node --test scripts/check-docs.test.mjs
  *
  * Uses `node:test` rather than a project's own test framework deliberately — see
- * the design's section 5.5 (github.com/magnifito/ai-doc-system): the scripts need
+ * the design's section 5.5 (github.com/magnifito/docs-notary): the scripts need
  * only Node plus the `yaml` package, and the suite is wired into the host
  * project's blocking gate next to `lint:docs`.
  */

@@ -50,8 +50,8 @@ try {
         const ownKind = kindForPath(config, rel)
         const destination = config.tiers.find(([, kind]) => kind !== ownKind)
         const promote = destination
-          ? `To act on it, promote it first: ai-doc-system mv ${rel} ${config.docsDir}/${destination[0]}<name>.md, then rewrite the prose.`
-          : 'To act on it, promote it into a higher tier first with `ai-doc-system mv`, then rewrite the prose.'
+          ? `To act on it, promote it first: docs-notary mv ${rel} ${config.docsDir}/${destination[0]}<name>.md, then rewrite the prose.`
+          : 'To act on it, promote it into a higher tier first with `docs-notary mv`, then rewrite the prose.'
         const context = `${rel} has status: reference — captured from elsewhere, NOT a commitment, never a build spec. Do not implement from it. ${promote}`
         process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: 'PreToolUse', additionalContext: context } }))
       }

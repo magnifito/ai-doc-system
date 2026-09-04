@@ -1,5 +1,5 @@
 /**
- * Tests for `ai-doc-system init` — the greenfield path: give a repository a
+ * Tests for `docs-notary init` — the greenfield path: give a repository a
  * gated docs tree in one command. Driven through the CLI like a consumer.
  *
  * Run: node --test scripts/init-docs.test.mjs
@@ -53,9 +53,9 @@ test('init wires the scripts into the host package.json without clobbering', () 
     cli(['init'], { cwd: root })
     const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
     assert.equal(pkg.scripts['lint:docs'], 'my-own-command')
-    assert.equal(pkg.scripts['gen:docs-index'], 'ai-doc-system gen')
-    assert.equal(pkg.scripts['lint:docs:advisory'], 'ai-doc-system advisory')
-    assert.equal(pkg.scripts['docs:impact'], 'ai-doc-system impact')
+    assert.equal(pkg.scripts['gen:docs-index'], 'docs-notary gen')
+    assert.equal(pkg.scripts['lint:docs:advisory'], 'docs-notary advisory')
+    assert.equal(pkg.scripts['docs:impact'], 'docs-notary impact')
   } finally {
     rmSync(root, { recursive: true, force: true })
   }

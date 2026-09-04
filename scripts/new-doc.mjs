@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * `ai-doc-system new <path>` — write a document that passes the gate on its
+ * `docs-notary new <path>` — write a document that passes the gate on its
  * first run: `kind` from the path, the tier's forced status or `draft`,
  * today's `updated`, then regenerate the index. Most gate failures come from
  * hand-written frontmatter; this removes the hand.
@@ -76,7 +76,7 @@ export function main() {
   const flags = flagValues('new', process.argv, ['--title', '--summary', '--status'])
   const [path] = docPaths()
   if (!path) {
-    console.error('usage: ai-doc-system new docs/<tier>/<name>.md [--title "..."] [--summary "..."] [--status <status>]')
+    console.error('usage: docs-notary new docs/<tier>/<name>.md [--title "..."] [--summary "..."] [--status <status>]')
     process.exit(2)
   }
   try {

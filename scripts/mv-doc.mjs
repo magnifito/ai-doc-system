@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * `ai-doc-system mv <from> <to>` — the mechanical half of the promotion
+ * `docs-notary mv <from> <to>` — the mechanical half of the promotion
  * lifecycle: `git mv`, restamp `kind`/`module`, set the status the destination
  * tier implies, record `promoted_from`, regenerate the index. The prose
  * rewrite that promotion demands stays a human step; `promoted_from` is what
@@ -108,7 +108,7 @@ export function main() {
   const flags = flagValues('mv', process.argv, ['--status', '--summary'])
   const [from, to] = docPaths()
   if (!from || !to) {
-    console.error('usage: ai-doc-system mv <from.md> <to.md> [--status <status>] [--summary "..."] [--adopt]')
+    console.error('usage: docs-notary mv <from.md> <to.md> [--status <status>] [--summary "..."] [--adopt]')
     process.exit(2)
   }
   try {

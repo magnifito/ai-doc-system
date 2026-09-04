@@ -42,7 +42,7 @@
  *
  * What it deliberately does NOT check — document age, prose style, whether
  * `code:` targets still exist, whether `updated:` matches git — is argued in
- * the design's section 5.3 (github.com/magnifito/ai-doc-system) and reported by
+ * the design's section 5.3 (github.com/magnifito/docs-notary) and reported by
  * check-docs-advisory.mjs.
  */
 import { execFileSync } from 'node:child_process'
@@ -283,7 +283,7 @@ export function checkDocs(root, config = loadConfig(root), options = {}) {
         const parsed = locked[entry] ? parsePathEvidence(entry) : null
         if (!parsed) continue
         const current = hashEvidence(root, parsed)
-        const fix = `run \`ai-doc-system verify --only ${path} --stamp\``
+        const fix = `run \`docs-notary verify --only ${path} --stamp\``
         // A null hash on a path the `evidence` check just passed means the file
         // shrank past the named line. That is drift, not "nothing to compare" —
         // reading it as the latter is how a claim outlives its evidence.

@@ -56,10 +56,10 @@ test('skills locate package files through CLAUDE_PLUGIN_ROOT only', () => {
   }
 })
 
-test('every ai-doc-system command a skill names exists', () => {
+test('every docs-notary command a skill names exists', () => {
   for (const name of skills()) {
     const { raw } = skill(name)
-    for (const match of raw.matchAll(/ai-doc-system ([a-z]+)/g)) {
+    for (const match of raw.matchAll(/docs-notary ([a-z]+)/g)) {
       assert.ok(COMMANDS.includes(match[1]), `${name}: unknown command "${match[1]}"`)
     }
   }
@@ -126,7 +126,7 @@ test('docs-gate sends a document with no frontmatter to docs-sort, not to `new`'
   const row = skill('docs-gate').raw.split('\n').find((line) => line.startsWith('| `frontmatter` |'))
   assert.ok(row, 'docs-gate: no remedy row for `frontmatter`')
   assert.match(row, /docs-sort/)
-  assert.doesNotMatch(row, /ai-doc-system new/)
+  assert.doesNotMatch(row, /docs-notary new/)
 })
 
 test('no skill tells the agent a case-only rename needs two git mv steps', () => {
@@ -138,12 +138,12 @@ test('no skill tells the agent a case-only rename needs two git mv steps', () =>
 })
 
 test('a skill that promises a plugin hook says the hook needs the engine in the host repo', () => {
-  // hooks/engine.mjs runs the host's node_modules/@puralex/ai-doc-system, or the
+  // hooks/engine.mjs runs the host's node_modules/@puralex/docs-notary, or the
   // plugin's own scripts only where `yaml` resolves. A plugin install is a bare
   // clone, so on the vendored route both hooks are silent; a skill that says
   // "installed as a plugin, the hook runs" without that condition is not true.
   for (const name of ['docs-promote', 'docs-gate']) {
     if (!skills().includes(name)) continue
-    assert.match(skill(name).raw, /node_modules\/@puralex\/ai-doc-system/, `${name}: promises a hook without its engine precondition`)
+    assert.match(skill(name).raw, /node_modules\/@puralex\/docs-notary/, `${name}: promises a hook without its engine precondition`)
   }
 })

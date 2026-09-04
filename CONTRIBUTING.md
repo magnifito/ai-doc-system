@@ -17,8 +17,8 @@ Thanks for considering a contribution.
 ## Getting started
 
 ```bash
-git clone https://github.com/magnifito/ai-doc-system.git
-cd ai-doc-system
+git clone https://github.com/magnifito/docs-notary.git
+cd docs-notary
 npm ci
 npm test                      # throwaway fixture trees
 npm run lint:docs             # the gate, against this repo's own docs/

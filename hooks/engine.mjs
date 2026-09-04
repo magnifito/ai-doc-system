@@ -8,7 +8,7 @@
  * own `try` block could swallow it — a stack trace on every Read and Write.
  *
  * The plugin is therefore a shim. The engine that runs is the one the HOST
- * repository installed (`node_modules/@puralex/ai-doc-system`), which is also
+ * repository installed (`node_modules/@puralex/docs-notary`), which is also
  * the version its gate runs, so a hook can never report rules the repository
  * itself does not enforce. The plugin's own copy is the fallback, and only in a
  * checkout where `yaml` actually resolves — a development clone. When neither
@@ -21,7 +21,7 @@ import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
-const PACKAGE = '@puralex/ai-doc-system'
+const PACKAGE = '@puralex/docs-notary'
 
 /** The plugin's own root — this file is `<root>/hooks/engine.mjs`. */
 const PLUGIN_ROOT = dirname(dirname(fileURLToPath(import.meta.url)))

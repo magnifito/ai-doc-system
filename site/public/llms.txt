@@ -1,4 +1,4 @@
-# ai-doc-system
+# docs-notary
 
 > A documentation system for repositories whose primary reader is an AI agent. Docs are tiered by
 > authority (reference / product / engineering / plans / archive), every file carries validated YAML
@@ -6,9 +6,9 @@
 > of it true. The core field is `status: reference` — it makes "not a commitment" machine-detectable,
 > so an agent never implements a captured competitor spec as if it were committed scope.
 
-Install: `npm install -D @puralex/ai-doc-system`, then `npx ai-doc-system init` (greenfield) or the
+Install: `npm install -D @puralex/docs-notary`, then `npx docs-notary init` (greenfield) or the
 migration procedure in the `docs-adopt` skill (existing tree). Claude Code plugin:
-`/plugin marketplace add magnifito/ai-doc-system`.
+`/plugin marketplace add magnifito/docs-notary`.
 
 Agent rule for any repo using this system: read `docs/index.json` first and filter by `kind` and
 `status`; never grep `docs/` blind. Nothing with `status: reference` may be implemented directly —
@@ -16,22 +16,22 @@ promote it into `product/` first.
 
 ## Docs
 
-- [README](https://github.com/magnifito/ai-doc-system/blob/main/README.md): what you get, the
+- [README](https://github.com/magnifito/docs-notary/blob/main/README.md): what you get, the
   default tiers, the frontmatter schema, the rule table with each rule's default severity, install
   routes.
-- [skills/](https://github.com/magnifito/ai-doc-system/tree/main/skills): the agent-facing
+- [skills/](https://github.com/magnifito/docs-notary/tree/main/skills): the agent-facing
   procedure, five skills — docs-adopt, docs-write, docs-promote, docs-audit, docs-gate — each
   self-contained and triggered by the situation an agent is in.
-- [Design](https://github.com/magnifito/ai-doc-system/blob/main/docs/engineering/design.md): the
+- [Design](https://github.com/magnifito/docs-notary/blob/main/docs/engineering/design.md): the
   full design — the problem, rejected alternatives, what the gate deliberately does not assert.
 
 ## Package
 
-- [npm: @puralex/ai-doc-system](https://www.npmjs.com/package/@puralex/ai-doc-system): CLI commands
+- [npm: @puralex/docs-notary](https://www.npmjs.com/package/@puralex/docs-notary): CLI commands
   `init` (greenfield tree), `new <path>` (a gate-clean document), `mv <from> <to>` (promotion: move,
   restamp, record `promoted_from`), `check` (the blocking gate; `--json`, `--format github`,
   `--base <ref>` for the history-aware rules), `verify` (runs command evidence, hashes path evidence,
   `--stamp` sets `verified_on`), `impact` (which documents claim the changed paths), `context` and
   `export` (documents with an authority banner; JSONL per heading for RAG), `gen`, `fix`, `advisory`,
   `migrate`. Node 20+, one dependency (`yaml`).
-- [GitHub](https://github.com/magnifito/ai-doc-system): Apache-2.0.
+- [GitHub](https://github.com/magnifito/docs-notary): Apache-2.0.

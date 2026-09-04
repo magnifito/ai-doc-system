@@ -14,7 +14,7 @@ import GrepVsIndex from '../components/GrepVsIndex.astro'
 import Gate from '../components/Gate.astro'
 import Lifecycle from '../components/Lifecycle.astro'
 
-const title = 'ai-doc-system'
+const title = 'docs-notary'
 const description =
   'Tier your docs by trust, put a machine-readable badge on every file, and let a blocking gate keep it true — so your agent never builds from a document that was never a promise.'
 ---
@@ -28,25 +28,25 @@ const description =
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://magnifito.github.io/ai-doc-system/" />
-    <meta property="og:image" content="https://magnifito.github.io/ai-doc-system/og.png" />
+    <meta property="og:url" content="https://magnifito.github.io/docs-notary/" />
+    <meta property="og:image" content="https://magnifito.github.io/docs-notary/og.png" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={description} />
-    <meta name="twitter:image" content="https://magnifito.github.io/ai-doc-system/og.png" />
+    <meta name="twitter:image" content="https://magnifito.github.io/docs-notary/og.png" />
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='0.9em' font-size='90'>⛩️</text></svg>" />
     <script
       type="application/ld+json"
       set:html={JSON.stringify({
         '@context': 'https://schema.org',
         '@type': 'SoftwareApplication',
-        name: 'ai-doc-system',
+        name: 'docs-notary',
         description,
         applicationCategory: 'DeveloperApplication',
         operatingSystem: 'macOS, Linux, Windows',
-        url: 'https://magnifito.github.io/ai-doc-system/',
-        downloadUrl: 'https://www.npmjs.com/package/@puralex/ai-doc-system',
-        codeRepository: 'https://github.com/magnifito/ai-doc-system',
+        url: 'https://magnifito.github.io/docs-notary/',
+        downloadUrl: 'https://www.npmjs.com/package/@puralex/docs-notary',
+        codeRepository: 'https://github.com/magnifito/docs-notary',
         license: 'https://www.apache.org/licenses/LICENSE-2.0',
         offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
       })}
@@ -71,7 +71,7 @@ const description =
       </p>
       <div class="cta-row">
         <a class="button primary" href="#install">Install the gate</a>
-        <a class="button ghost" href="https://github.com/magnifito/ai-doc-system">Read the source</a>
+        <a class="button ghost" href="https://github.com/magnifito/docs-notary">Read the source</a>
       </div>
     </header>
 
@@ -144,12 +144,12 @@ const description =
       <Gate />
       <p>What it looks like from the terminal:</p>
 
-<pre class="wide"><code><span class="prompt">$</span> npx ai-doc-system check
+<pre class="wide"><code><span class="prompt">$</span> npx docs-notary check
 <span class="r">docs/reference/crm/pipelines.md:status — is "active" but everything
   under docs/reference/ is status: reference</span>
 <span class="r">check-docs FAILED — 1 violation(s).</span>
 
-<span class="prompt">$</span> npx ai-doc-system check   <span class="c"># after the fix</span>
+<span class="prompt">$</span> npx docs-notary check   <span class="c"># after the fix</span>
 <span class="g">check-docs: OK</span></code></pre>
 
       <p class="caption">
@@ -208,19 +208,19 @@ const description =
             in. The skill encodes the judgement calls, not just the mechanics.
           </p>
 <pre><code><span class="c"># in Claude Code:</span>
-<span class="prompt">&gt;</span> /plugin marketplace add magnifito/ai-doc-system
-<span class="prompt">&gt;</span> /plugin install ai-doc-system@magnifito
+<span class="prompt">&gt;</span> /plugin marketplace add magnifito/docs-notary
+<span class="prompt">&gt;</span> /plugin install docs-notary@magnifito
 <span class="c"># then, in your repository:</span>
 <span class="prompt">&gt;</span> set up the documentation system in this repo</code></pre>
         </div>
 
         <div class="path">
           <h3>From npm — just the tooling</h3>
-<pre><code><span class="prompt">$</span> npm install -D @puralex/ai-doc-system
-<span class="prompt">$</span> npx ai-doc-system init       <span class="c"># fresh tree, gate-clean</span>
-<span class="prompt">$</span> npx ai-doc-system gen        <span class="c"># the map</span>
-<span class="prompt">$</span> npx ai-doc-system check      <span class="c"># the gate</span>
-<span class="prompt">$</span> npx ai-doc-system advisory   <span class="c"># drift report</span></code></pre>
+<pre><code><span class="prompt">$</span> npm install -D @puralex/docs-notary
+<span class="prompt">$</span> npx docs-notary init       <span class="c"># fresh tree, gate-clean</span>
+<span class="prompt">$</span> npx docs-notary gen        <span class="c"># the map</span>
+<span class="prompt">$</span> npx docs-notary check      <span class="c"># the gate</span>
+<span class="prompt">$</span> npx docs-notary advisory   <span class="c"># drift report</span></code></pre>
         </div>
       </div>
     </section>
@@ -228,12 +228,12 @@ const description =
     <!-- footer -->
     <footer class="doc">
       <div class="cta-row">
-        <a class="button primary" href="https://github.com/magnifito/ai-doc-system">Star it on GitHub</a>
-        <a class="button ghost" href="https://github.com/magnifito/ai-doc-system/blob/main/docs/engineering/design.md">The full design, rejected alternatives included</a>
+        <a class="button primary" href="https://github.com/magnifito/docs-notary">Star it on GitHub</a>
+        <a class="button ghost" href="https://github.com/magnifito/docs-notary/blob/main/docs/engineering/design.md">The full design, rejected alternatives included</a>
       </div>
       <small>
         Apache-2.0 · plain ESM, Node 20+ ·
-        <a href="https://github.com/magnifito/ai-doc-system/tree/main/skills">skills/</a> is the
+        <a href="https://github.com/magnifito/docs-notary/tree/main/skills">skills/</a> is the
         agent-facing procedure
       </small>
     </footer>

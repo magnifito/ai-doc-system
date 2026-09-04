@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 /**
- * `ai-doc-system context [--kind a,b] [--status s] [--module m] [--max-chars N] [paths…]`
+ * `docs-notary context [--kind a,b] [--status s] [--module m] [--max-chars N] [paths…]`
  *   emits the selected documents with an AUTHORITY banner on each, within a
  *   character budget, so a document pasted into a conversation still says
  *   what it is.
- * `ai-doc-system export --jsonl [same filters]`
+ * `docs-notary export --jsonl [same filters]`
  *   emits one JSON record per heading section, frontmatter on every record,
  *   for RAG stores that chunk — the place where a document's status used to
  *   get lost.
@@ -130,8 +130,8 @@ export function renderJsonl(root, entries) {
 }
 
 const USAGE = [
-  'usage: ai-doc-system context [--kind a,b] [--status s] [--module m] [--max-chars N] [paths…]',
-  '       ai-doc-system export [--jsonl] [--kind a,b] [--status s] [--module m] [paths…]',
+  'usage: docs-notary context [--kind a,b] [--status s] [--module m] [--max-chars N] [paths…]',
+  '       docs-notary export [--jsonl] [--kind a,b] [--status s] [--module m] [paths…]',
 ].join('\n')
 
 const VALUE_FLAGS = { '--kind': 'kind', '--status': 'status', '--module': 'module', '--max-chars': 'maxChars' }

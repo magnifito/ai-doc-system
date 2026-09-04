@@ -3,7 +3,7 @@ title: "Design: a documentation system for agent-built repositories"
 summary: What the docs-by-authority system is, why each gate assertion exists, and how it is wired.
 kind: engineering
 status: active
-updated: 2026-09-03
+updated: 2026-09-04
 ---
 
 # Design: a documentation system for agent-built repositories
@@ -166,7 +166,7 @@ YAML frontmatter on every `.md` under `docs/`, except two exempt files: `INDEX.m
 ---
 title: Recurring Invoices     # string, required
 status: reference             # enum, required — see 4.3
-updated: 2026-05-29           # ISO date, required — see 4.6 for who maintains it
+updated: 2026-09-04
 ---
 ```
 
@@ -210,8 +210,8 @@ project can group by something else first — `modules/*/state/` — and still d
 tier segment inside it.
 
 It appears in `index.json`, and in frontmatter, and the gate rejects a document where the two
-disagree. Moving a file between tiers changes its kind; `ai-doc-system mv` moves and restamps in one
-step, and `ai-doc-system fix` restamps a move already made by hand.
+disagree. Moving a file between tiers changes its kind; `docs-notary mv` moves and restamps in one
+step, and `docs-notary fix` restamps a move already made by hand.
 
 ### 4.2a `module` — the optional second axis
 
@@ -303,7 +303,7 @@ frontmatter-versus-git drift would punish typo fixes. So the contract is honest 
 means "last substantive change, per the author", and the advisory pass reports drift without blocking
 anything.
 
-One command sets it: `ai-doc-system mv` restamps `updated` to today, because a promotion IS a
+One command sets it: `docs-notary mv` restamps `updated` to today, because a promotion IS a
 substantive change — the prose rewrite that must follow it is mandatory.
 
 ---
@@ -427,7 +427,7 @@ fetched, and silently dropping these two would report a green gate that checked 
   a move), when a cross-tier rename carries no `promoted_from` at all, and when the body is
   identical to the origin's at the base. The last one is §6.2's mandatory prose rewrite, finally
   checkable: promoting a captured document verbatim is how someone else's assumptions become your
-  requirements. `ai-doc-system mv` writes `promoted_from` on any cross-tier move, so the honest path
+  requirements. `docs-notary mv` writes `promoted_from` on any cross-tier move, so the honest path
   is also the easy one.
 
 **Four rules warn rather than block.** `shipped-code` wants `code:` on a shipped document (§4.3
@@ -481,7 +481,7 @@ the `git grep` branch and its exclusion list.
 grepping the tree for the path.
 
 The index therefore carries a reverse map: `by_code` in `index.json`, built from every `code:` field
-and every path-form `evidence` entry, sorted, one key per claimed path. `ai-doc-system impact` diffs
+and every path-form `evidence` entry, sorted, one key per claimed path. `docs-notary impact` diffs
 the working tree (with `--base <ref>`, the merge base of that ref and `HEAD`) and prints the
 documents whose claims cover a changed path, with each document's `verified_on` where it has one —
 a claim that was verified on a date is exactly the claim a code change can falsify.
@@ -493,7 +493,7 @@ documents it may have made untrue without anyone opening a log.
 
 ### 5.7 Executable evidence
 
-`evidence` was form-checked and never run (§7, limitation 6). `ai-doc-system verify` closes the half of that gap
+`evidence` was form-checked and never run (§7, limitation 6). `docs-notary verify` closes the half of that gap
 which is mechanically closable, one document at a time (`--only <doc>`) or across the tree:
 
 - **Command-form entries are executed** — through the shell, from the repository root, with a 60-second
@@ -586,7 +586,7 @@ see it.
 A document pasted into a conversation, or chunked into a RAG store, arrives without its path — and
 the path is where its authority lived. That is the original failure mode wearing a different hat.
 
-`ai-doc-system context` emits selected documents (filtered with `--kind`, `--status`, `--module`, or
+`docs-notary context` emits selected documents (filtered with `--kind`, `--status`, `--module`, or
 explicit paths, all ANDed) each preceded by a banner:
 
 ```
@@ -600,7 +600,7 @@ document, in a sentence that survives a copy-paste. `--max-chars N` keeps a pack
 budget, dropping whole documents rather than truncating one mid-sentence — and the first document is
 always emitted whole, however large, because a pack with nothing in it answers no question.
 
-`ai-doc-system export` is the same selection as JSONL, **one record per heading section**, with the
+`docs-notary export` is the same selection as JSONL, **one record per heading section**, with the
 frontmatter repeated on every record. A chunker that splits a document into twenty pieces would
 otherwise carry the status on the first piece only, and the other nineteen read as fact.
 
