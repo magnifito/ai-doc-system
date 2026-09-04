@@ -43,7 +43,7 @@ never guess a tier to make the gate green.
 ## 3. Move and stamp with one command
 
 ```bash
-ai-doc-system mv docs/superpowers/plans/2026-09-04-feature-x.md docs/plans/feature-x.md --adopt --summary "One line."
+ai-doc-system mv docs/superpowers/plans/<date>-<name>.md docs/plans/<name>.md --adopt --summary "One line."
 ```
 
 `--adopt` is for a source with no frontmatter. `mv` moves it (`git mv`, or a plain rename for a
