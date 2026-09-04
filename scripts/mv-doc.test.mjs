@@ -196,3 +196,35 @@ test('a git mv failure that is not an untracked source surfaces as one line', (t
     rmSync(root, { recursive: true, force: true })
   }
 })
+
+test('mv --adopt stamps frontmatter on a stray that has none, and records no promotion', () => {
+  // The shape another skill leaves behind: a plan under a path that is no tier,
+  // with a heading and no `---` block.
+  const root = gitFixture({
+    'docs/superpowers/plans/2026-09-04-feature-x.md': '# Feature X plan\n\nSteps.\n',
+    'docs/engineering/keep.md': GOOD,
+  })
+  try {
+    execFileSync(process.execPath, [join(PACKAGE_ROOT, 'scripts', 'gen-docs-index.mjs')], { cwd: root, stdio: 'pipe' })
+    assert.throws(
+      () => mvDoc(root, 'docs/superpowers/plans/2026-09-04-feature-x.md', 'docs/plans/feature-x.md'),
+      /has no frontmatter/,
+    )
+    const result = mvDoc(root, 'docs/superpowers/plans/2026-09-04-feature-x.md', 'docs/plans/feature-x.md', {
+      adopt: true,
+      summary: 'Plan for feature X.',
+      now: new Date('2026-09-04T12:00:00Z'),
+    })
+    assert.deepEqual(result.restamped, { kind: 'plan', module: null, status: 'draft' })
+    assert.equal(result.adopted, true)
+    const text = readFileSync(join(root, 'docs/plans/feature-x.md'), 'utf8')
+    assert.match(text, /^---\ntitle: Feature X plan\nsummary: Plan for feature X\.\nkind: plan\nstatus: draft\nupdated: 2026-09-04\n---\n/)
+    // A stray was never a document of another tier, so sorting it is not a
+    // promotion: nothing for `check --base` to demand a rewrite of.
+    assert.doesNotMatch(text, /promoted_from/)
+    assert.match(text, /\n# Feature X plan\n\nSteps\.\n$/)
+    assert.equal(checkDocs(root).filter((v) => v.severity === 'error').length, 0)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})

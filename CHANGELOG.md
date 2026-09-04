@@ -5,6 +5,48 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2026-09-04
+
+### Added
+
+- `mv --adopt`: move a document that has no frontmatter — a stray another tool wrote under a
+  path the tiering does not know — and stamp the block in the same step (`title` from the first
+  heading, `kind` from the destination, forced or `--status` or `draft`, today's `updated`).
+  `mv --summary "…"` sets the index line on any move.
+- `docs-sort` skill: find strays (`check --json`, untracked Markdown), pick a tier by authority,
+  `mv --adopt`, regenerate. Replaces `docs-write`, whose case — an agent authoring a document
+  from scratch — is not what a sorting tool is for.
+
+### Changed
+
+- `check --base`: a move from a path under no tier into a tier is adoption, not promotion. It no
+  longer demands `promoted_from` or a prose rewrite, and `mv` records no `promoted_from` for it.
+- Skills corrected against the code: the gate does catch a link left pointing at a moved path
+  (`docs-promote`); a case-only rename is one `git mv`; both plugin hooks need the engine in the
+  host's `node_modules` and are silent on the vendored route; `docs-gate` sends a missing
+  frontmatter block to `docs-sort` instead of `new`, which refuses an existing file.
+
+## [1.4.0] - 2026-09-03
+
+### Added
+
+- Five skills under `skills/`, each self-contained and triggered by the situation an agent is in:
+  `docs-adopt` (first-time setup and migration), `docs-write` (add or edit a document),
+  `docs-promote` (promote, move, supersede), `docs-audit` (periodic judgement: advisory, verify,
+  impact) and `docs-gate` (fix a red gate).
+- `scripts/skills.test.mjs`: a test that keeps the skill set structurally honest — every
+  `skills/<name>/SKILL.md` exists, the root `SKILL.md` is gone, and no skill references the old
+  single-file section numbering.
+
+### Changed
+
+- The root `SKILL.md` is gone; Claude Code ignores it once a `skills/` directory exists.
+- `${CLAUDE_SKILL_DIR}` replaced by `${CLAUDE_PLUGIN_ROOT}` throughout hooks and skill text.
+
+### Removed
+
+- `SKILL.md` from the npm `files` list; `skills/` ships instead.
+
 ## [1.3.0] - 2026-09-03
 
 ### Added
@@ -128,6 +170,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Optional module axis with `state` / `todo` kinds (`evidence` / `changes` validation).
 - `SKILL.md` agent procedure.
 
+[1.4.0]: https://github.com/magnifito/ai-doc-system/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/magnifito/ai-doc-system/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/magnifito/ai-doc-system/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/magnifito/ai-doc-system/compare/v1.0.0...v1.1.0

@@ -361,6 +361,28 @@ test('a capture and a promotion committed on one branch is clean, and still owes
   }
 })
 
+test('retiring a document into archive keeps its prose and owes no rewrite', () => {
+  const root = gitFixture({ 'README.md': '# Repo\n', 'docs/product/old.md': '---\ntitle: Old\nkind: product\nstatus: active\nupdated: 2026-08-17\n---\n# Old\n\nWhat the product did, kept word for word once it is retired.\n', 'docs/product/new.md': '---\ntitle: New\nkind: product\nstatus: active\nupdated: 2026-08-17\n---\n# New\n\nWhat the product does now.\n' })
+  const git = (...args) => execFileSync('git', args, { cwd: root, stdio: 'pipe' })
+  try {
+    regen(root)
+    commitAll(root)
+    git('branch', '-M', 'main')
+    git('checkout', '-qb', 'feature')
+
+    // The supersede sequence docs-promote prescribes: point at the successor,
+    // then move into archive. The prose is deliberately untouched.
+    const path = join(root, 'docs/product/old.md')
+    writeFileSync(path, readFileSync(path, 'utf8').replace('updated: 2026-08-17\n', 'updated: 2026-08-17\nsuperseded_by: docs/product/new.md\n'))
+    mvDoc(root, 'docs/product/old.md', 'docs/archive/old.md')
+    regen(root)
+
+    assert.deepEqual(promotionRules(checkDocs(root, undefined, { base: 'main' })), [])
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
 test('a promoted_from naming a path that existed nowhere is still reported, committed or not', () => {
   const root = gitFixture({ 'README.md': '# Repo\n', 'docs/engineering/seed.md': '---\ntitle: Seed\nkind: engineering\nstatus: active\nupdated: 2026-08-17\n---\n# Seed\n\nSomething for the tree to hold before the branch starts.\n', })
   const git = (...args) => execFileSync('git', args, { cwd: root, stdio: 'pipe' })
@@ -380,6 +402,25 @@ test('a promoted_from naming a path that existed nowhere is still reported, comm
     const hit = checkDocs(root, undefined, { base: 'main' }).find((v) => v.rule === 'promoted-verbatim')
     assert.ok(hit, 'an origin that existed nowhere must still be reported')
     assert.match(hit.message, /names docs\/reference\/nope\.md, which did not exist at main/)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('a stray sorted into a tier from a path under no tier is adoption, not promotion', () => {
+  const body = '# Feature X plan\n\nSteps, at length: several sentences of plan that another skill wrote\nunder a path the tiering does not know, and that sorting must keep verbatim.\n'
+  const root = gitFixture({ 'docs/superpowers/plans/2026-09-04-feature-x.md': body, 'docs/product/y.md': fm('active') })
+  try {
+    regen(root)
+    commitAll(root)
+    mkdirSync(join(root, 'docs/plans'), { recursive: true })
+    execFileSync('git', ['mv', 'docs/superpowers/plans/2026-09-04-feature-x.md', 'docs/plans/feature-x.md'], { cwd: root, stdio: 'pipe' })
+    writeFileSync(
+      join(root, 'docs/plans/feature-x.md'),
+      `---\ntitle: Feature X plan\nkind: plan\nstatus: draft\nupdated: 2026-09-04\n---\n${body}`,
+    )
+    regen(root)
+    assert.deepEqual(promotionRules(checkDocs(root, undefined, { base: 'HEAD' })), [])
   } finally {
     rmSync(root, { recursive: true, force: true })
   }

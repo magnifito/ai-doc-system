@@ -15,6 +15,7 @@ The populated tiers:
 | `engineering/adr/` | Architecture decision records (`kind: adr`), one per decision that was reversed or is worth defending later. |
 | `plans/` | Work in flight — the debt and improvement backlog. |
 
-The agent-facing procedure lives at the repository root as [`SKILL.md`](../SKILL.md), because skill
-loaders require it there. Frontmatter, tiers and the gate's assertions are documented in
-[`design.md`](engineering/design.md) and the root [`README.md`](../README.md).
+The agent-facing procedure lives in [`skills/`](../skills/) at the repository root, one directory
+per skill, because Claude Code loads `skills/<name>/SKILL.md`. Frontmatter, tiers and the gate's
+assertions are documented in [`design.md`](engineering/design.md) and the root
+[`README.md`](../README.md).

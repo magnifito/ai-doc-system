@@ -334,8 +334,11 @@ export function checkDocs(root, config = loadConfig(root), options = {}) {
       const originPath = data.promoted_from ?? renamedOrigin ?? path
       // Only a move that changed the document's AUTHORITY is a promotion. A
       // same-tier rename changes a filename and nothing else — demanding a
-      // rewrite of prose that stayed true is noise.
-      const crossedTier = originPath !== path && kindForPath(config, originPath) !== kindForPath(config, path)
+      // rewrite of prose that stayed true is noise. And a move from a path
+      // under NO tier (a stray another tool wrote) is adoption: there was no
+      // authority to promote from, so no trail and no rewrite are owed.
+      const originKind = kindForPath(config, originPath)
+      const crossedTier = originPath !== path && originKind !== null && originKind !== kindForPath(config, path)
       const before = showAtRef(root, baseSha, originPath)
       if (data.promoted_from) {
         // An origin the BRANCH created and then moved away never existed at the
@@ -386,8 +389,12 @@ export function checkDocs(root, config = loadConfig(root), options = {}) {
       // authority. The prose to compare against is the origin at the merge
       // base; when the branch itself captured the origin there is no copy
       // there, so it is read from the last commit that held it. A capture and a
-      // promotion in one branch must still rewrite the prose.
-      if (data.promoted_from || crossedTier) {
+      // promotion in one branch must still rewrite the prose. A move INTO the
+      // archive tier is the one cross-tier move that keeps its prose on
+      // purpose: an archived document is a record of what was said, so the
+      // rewrite is not owed there — only the `promoted_from` trail is.
+      const archived = kindForPath(config, path) === 'archive'
+      if ((data.promoted_from || crossedTier) && !archived) {
         const priorSource = before ?? showLastInRange(root, baseSha, 'HEAD', originPath)
         const where = before === null ? 'before this branch moved it' : `at ${options.base}`
         if (priorSource !== null && parseFrontmatter(priorSource).body.trim() === body.trim()) {
