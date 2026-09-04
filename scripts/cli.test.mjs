@@ -409,6 +409,7 @@ test('a value flag given without a value is a usage error, not a silently skippe
       [['new', 'docs/product/p.md', '--summary'], 'new: --summary needs a value'],
       [['new', 'docs/product/p.md', '--status'], 'new: --status needs a value'],
       [['mv', 'docs/product/p.md', 'docs/engineering/p.md', '--status'], 'mv: --status needs a value'],
+      [['mv', 'docs/product/p.md', 'docs/engineering/p.md', '--summary'], 'mv: --summary needs a value'],
       [['migrate', '--map'], 'migrate: --map needs a value'],
     ]
     for (const [args, message] of cases) {

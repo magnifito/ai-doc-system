@@ -8,7 +8,7 @@ import { RULES } from './docs-config.mjs'
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)))
 const SKILLS = join(ROOT, 'skills')
-const EXPECTED = ['docs-adopt', 'docs-write', 'docs-promote', 'docs-audit', 'docs-gate']
+const EXPECTED = ['docs-adopt', 'docs-sort', 'docs-promote', 'docs-audit', 'docs-gate']
 // Claude Code truncates or rejects longer descriptions; the trigger must fit.
 const DESCRIPTION_MAX = 1024
 // The subcommands cli/cli.mjs dispatches. Kept by hand — importing that module would run the
@@ -93,11 +93,11 @@ test('every skill hands off by naming a sibling skill, never a section number of
   }
 })
 
-test('docs-write says which frontmatter fields take a list and which take one value', () => {
-  if (!skills().includes('docs-write')) return
+test('docs-sort says which frontmatter fields take a list and which take one value', () => {
+  if (!skills().includes('docs-sort')) return
   // The field table's rows: `| \`field\` | when to write it | what the gate checks |`.
   const rows = new Map(
-    skill('docs-write')
+    skill('docs-sort')
       .raw.split('\n')
       .filter((line) => /^\| `[a-z_]+` \|/.test(line))
       .map((line) => [/^\| `([a-z_]+)` \|/.exec(line)[1], line]),
@@ -108,11 +108,42 @@ test('docs-write says which frontmatter fields take a list and which take one va
   // then rejected as a `vocabulary` violation.
   const asList = /a list of/i
   for (const field of LIST_FIELDS) {
-    assert.ok(rows.has(field), `docs-write: no field-table row for \`${field}\``)
+    assert.ok(rows.has(field), `docs-sort: no field-table row for \`${field}\``)
     assert.match(rows.get(field), asList, `docs-write: \`${field}\` is a list field; its row must say so`)
   }
   assert.ok(SCALAR_FIELDS.includes('code'), 'code is expected to be a scalar field')
-  assert.ok(rows.has('code'), 'docs-write: no field-table row for `code`')
-  assert.doesNotMatch(rows.get('code'), asList, 'docs-write: `code` takes one path, not a list')
-  assert.match(rows.get('code'), /\bone\b/i, 'docs-write: the `code` row must say it takes one path')
+  assert.ok(rows.has('code'), 'docs-sort: no field-table row for `code`')
+  assert.doesNotMatch(rows.get('code'), asList, 'docs-sort: `code` takes one path, not a list')
+  assert.match(rows.get('code'), /\bone\b/i, 'docs-sort: the `code` row must say it takes one path')
+})
+
+test('docs-gate sends a document with no frontmatter to docs-sort, not to `new`', () => {
+  if (!skills().includes('docs-gate')) return
+  // The most common red gate is a stray another tool wrote under docs/ with no
+  // `---` block. `new` refuses an existing file and a path under no tier, so a
+  // remedy naming it sends the agent to two usage errors and then to
+  // hand-written frontmatter — the failure the tools exist to remove.
+  const row = skill('docs-gate').raw.split('\n').find((line) => line.startsWith('| `frontmatter` |'))
+  assert.ok(row, 'docs-gate: no remedy row for `frontmatter`')
+  assert.match(row, /docs-sort/)
+  assert.doesNotMatch(row, /ai-doc-system new/)
+})
+
+test('no skill tells the agent a case-only rename needs two git mv steps', () => {
+  // `git mv a.md A.md` is one step on a case-insensitive filesystem (verified on
+  // macOS, git 2.55). The two-step dance is for a plain `mv` followed by `git add`.
+  for (const name of skills()) {
+    assert.doesNotMatch(skill(name).raw, /two\*?\*? ?`git mv`s/, `${name}: claims a case-only rename needs two git mv`)
+  }
+})
+
+test('a skill that promises a plugin hook says the hook needs the engine in the host repo', () => {
+  // hooks/engine.mjs runs the host's node_modules/@puralex/ai-doc-system, or the
+  // plugin's own scripts only where `yaml` resolves. A plugin install is a bare
+  // clone, so on the vendored route both hooks are silent; a skill that says
+  // "installed as a plugin, the hook runs" without that condition is not true.
+  for (const name of ['docs-promote', 'docs-gate']) {
+    if (!skills().includes(name)) continue
+    assert.match(skill(name).raw, /node_modules\/@puralex\/ai-doc-system/, `${name}: promises a hook without its engine precondition`)
+  }
 })

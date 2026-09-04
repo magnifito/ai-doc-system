@@ -5,6 +5,27 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- `mv --adopt`: move a document that has no frontmatter — a stray another tool wrote under a
+  path the tiering does not know — and stamp the block in the same step (`title` from the first
+  heading, `kind` from the destination, forced or `--status` or `draft`, today's `updated`).
+  `mv --summary "…"` sets the index line on any move.
+- `docs-sort` skill: find strays (`check --json`, untracked Markdown), pick a tier by authority,
+  `mv --adopt`, regenerate. Replaces `docs-write`, whose case — an agent authoring a document
+  from scratch — is not what a sorting tool is for.
+
+### Changed
+
+- `check --base`: a move from a path under no tier into a tier is adoption, not promotion. It no
+  longer demands `promoted_from` or a prose rewrite, and `mv` records no `promoted_from` for it.
+- Skills corrected against the code: the gate does catch a link left pointing at a moved path
+  (`docs-promote`); a case-only rename is one `git mv`; both plugin hooks need the engine in the
+  host's `node_modules` and are silent on the vendored route; `docs-gate` sends a missing
+  frontmatter block to `docs-sort` instead of `new`, which refuses an existing file.
+
 ## [1.4.0] - 2026-09-03
 
 ### Added

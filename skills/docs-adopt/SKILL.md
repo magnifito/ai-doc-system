@@ -1,6 +1,6 @@
 ---
 name: docs-adopt
-description: Use when a repository has no docs/index.json and its docs tree is unnavigable, misleading, or unenforced — an agent cannot tell whether a document describes something the product has, has committed to, or will never build. Surveys the tree, asks the four questions, installs @puralex/ai-doc-system, writes the migration map, tiers every document by authority, stamps validated frontmatter, generates the agent-readable index, and wires the blocking gate into CI. Not for a tree that already has docs/index.json — use docs-write, docs-promote, docs-audit or docs-gate there.
+description: Use when a repository has no docs/index.json and its docs tree is unnavigable, misleading, or unenforced — an agent cannot tell whether a document describes something the product has, has committed to, or will never build. Surveys the tree, asks the four questions, installs @puralex/ai-doc-system, writes the migration map, tiers every document by authority, stamps validated frontmatter, generates the agent-readable index, and wires the blocking gate into CI. Not for a tree that already has docs/index.json — use docs-sort, docs-promote, docs-audit or docs-gate there.
 ---
 
 # Adopt the documentation system
@@ -13,8 +13,8 @@ The problem this solves is not tidiness. A tree with no metadata has one default
 agent greps for a feature, finds a confident specification, and implements something the project
 never committed to. `status: reference` is the field that makes "not a commitment" machine-detectable.
 
-**Stop if `docs/index.json` exists.** The tree is adopted. Adding a document is docs-write, moving
-or promoting one is docs-promote, cleaning up is docs-audit, a red gate is docs-gate.
+**Stop if `docs/index.json` exists.** The tree is adopted. A stray with no frontmatter is docs-sort,
+moving or promoting one is docs-promote, cleaning up is docs-audit, a red gate is docs-gate.
 
 ## 1. Survey before proposing anything
 
@@ -65,8 +65,8 @@ defaults ships no config file. Unknown keys are rejected, so a typo cannot silen
 Settle naming before you migrate, not after. Kebab-case is the default; decide the sentinel set
 (`README`, `INDEX`, `STATUS`, `ROADMAP`, `PRD` …) and whether the project has a programme prefix
 worth declaring (`OPUS-`, `RFC-`), and put both in the config. The survey shows the proof: grep for
-the same stem in two casings. Renaming for case alone needs **two** `git mv`s through a temporary
-name on macOS and Windows.
+the same stem in two casings. `git mv` renames for case alone in one step, also on macOS and
+Windows; only a plain `mv` followed by `git add` needs a temporary name.
 
 Wire up the scripts. On the npm route these four are exactly what `init` writes (for a migration,
 where `init` does not run, add them by hand):
@@ -100,9 +100,12 @@ Copy `templates/docs-migration.map.example.mjs` (from `${CLAUDE_PLUGIN_ROOT}/tem
 write the real map. Then:
 
 ```bash
-node scripts/migrate-docs.mjs --dry-run    # print the map + the files whose refs would change
-node scripts/migrate-docs.mjs --apply      # git mv, stamp frontmatter, rewrite references
+npx ai-doc-system migrate --dry-run    # print the map + the files whose refs would change
+npx ai-doc-system migrate --apply      # git mv, stamp frontmatter, rewrite references
 ```
+
+(Vendored: `node scripts/migrate-docs.mjs`, and the same for `gen-docs-index.mjs` and
+`check-docs.mjs` below.)
 
 Iterate on `--dry-run` until every row is right and `unmapped` is only what genuinely needs a human.
 `--apply` aborts before the first `git mv` if two sources collide on one destination.
@@ -114,12 +117,16 @@ Then, in this order:
    for a link whose target never existed, de-link the text rather than inventing a target.
 3. **Copy `templates/docs-README.template.md`** to `<docsDir>/README.md` and edit it to match the
    project's actual tiers.
-4. `node scripts/gen-docs-index.mjs`, then `node scripts/check-docs.mjs` until it prints OK. A
-   violation you do not understand is docs-gate.
-5. **Delete `docs-migration.map.mjs`** (and, on the vendored route, `migrate-docs.mjs`) from the
-   target. They ran once.
+4. `npx ai-doc-system gen`, then `npx ai-doc-system check` until it prints OK. A violation you
+   do not understand is docs-gate.
+5. **Delete `docs-migration.map.mjs`** from the target (and, on the vendored route,
+   `migrate-docs.mjs` together with `migrate-docs.test.mjs`, which imports it). They ran once.
 6. Add a section to the target's `AGENTS.md` / `CLAUDE.md`: *read `docs/index.json` first, never
-   grep `docs/` blind*, plus the promotion rule.
+   grep `docs/` blind*, plus the promotion rule and where other tools' documents get sorted
+   (docs-sort).
+
+The plugin's two hooks need an engine: `npm install -D @puralex/ai-doc-system` in the target is what
+makes them speak. On the vendored route they stay silent.
 
 ## 4. What the migration must not decide
 

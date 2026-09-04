@@ -334,8 +334,11 @@ export function checkDocs(root, config = loadConfig(root), options = {}) {
       const originPath = data.promoted_from ?? renamedOrigin ?? path
       // Only a move that changed the document's AUTHORITY is a promotion. A
       // same-tier rename changes a filename and nothing else — demanding a
-      // rewrite of prose that stayed true is noise.
-      const crossedTier = originPath !== path && kindForPath(config, originPath) !== kindForPath(config, path)
+      // rewrite of prose that stayed true is noise. And a move from a path
+      // under NO tier (a stray another tool wrote) is adoption: there was no
+      // authority to promote from, so no trail and no rewrite are owed.
+      const originKind = kindForPath(config, originPath)
+      const crossedTier = originPath !== path && originKind !== null && originKind !== kindForPath(config, path)
       const before = showAtRef(root, baseSha, originPath)
       if (data.promoted_from) {
         // An origin the BRANCH created and then moved away never existed at the

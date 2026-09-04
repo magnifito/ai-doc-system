@@ -1,6 +1,6 @@
 ---
 name: docs-gate
-description: Use when ai-doc-system check fails — "check-docs FAILED", a GitHub annotation from check --format github, the plugin's edit hook reporting errors after a Write or Edit, or CI red on lint:docs. Reads the rule id in brackets, applies the one remedy that fixes the cause, and never silences a rule to make CI pass. Not for creating (docs-write), moving (docs-promote) or reviewing (docs-audit) documents.
+description: Use when ai-doc-system check fails — "check-docs FAILED", a GitHub annotation from check --format github, the plugin's edit hook reporting errors after a Write or Edit, or CI red on lint:docs. Reads the rule id in brackets, applies the one remedy that fixes the cause, and never silences a rule to make CI pass. Not for sorting a stray with no frontmatter (docs-sort), moving (docs-promote) or reviewing (docs-audit) documents.
 ---
 
 # Fix a red gate
@@ -30,11 +30,11 @@ you pass `--all`.
 
 | Rule | It means | Fix |
 |---|---|---|
-| `frontmatter` | No `---` block, or YAML the parser rejects. | Add the block with `ai-doc-system new` for a new file, or repair the YAML (quote a value with a colon). |
+| `frontmatter` | No `---` block, or YAML the parser rejects. | No block is a stray another tool wrote: docs-sort moves and stamps it with `ai-doc-system mv --adopt`. Rejected YAML: repair it (quote a value with a colon). |
 | `required` | A required field is missing: `title`, `kind`, `status`, `updated`, `module` (when the project configures modules), or a project-required field. | Add it. `kind` and `module` come from `ai-doc-system fix`. |
 | `vocabulary` | A value is outside the declared set, a scalar field is written as a list or a map, or stored `kind`/`module` disagrees with what the path implies. | Use a declared `kind`/`status`; `module` from the config; lists for `evidence` and `changes`, a single path for `code`, strings elsewhere. `ai-doc-system fix` restamps `kind`/`module` to match the path; if the path itself is wrong, docs-promote moves the file. |
 | `date` | `updated`, `review_by` or `verified_on` is not a real `YYYY-MM-DD` date. | Write the real date. `2026-13-45` is refused. |
-| `path` | A directory segment or file name is not kebab-case, or an ALL-CAPS basename is not a declared sentinel or prefix. | Rename the file or directory (two `git mv`s for a case-only rename), or declare it in `sentinels` / `allowedBasenamePrefixes`. |
+| `path` | A directory segment or file name is not kebab-case, or an ALL-CAPS basename is not a declared sentinel or prefix. | Rename the file or directory with `git mv` (one step, also for a case-only rename), or declare it in `sentinels` / `allowedBasenamePrefixes`. |
 | `basename` | Two documents in one tier (and module) share a basename. | Rename one, or declare it in `sentinels` if it is a per-folder entry point. |
 | `link` | A Markdown link or a tracked file names a document that does not exist case-exactly. | Point at the real file; de-link text whose target never existed. |
 | `implements` | The `implements` target is missing. | Point at the live document. |
@@ -66,7 +66,7 @@ to `off` in the same change that would have tripped it.
 Installed as a plugin, `docs-notary` re-runs the gate on the whole tree after every Write, Edit or
 MultiEdit that touches a `.md` file under the docs directory of an adopted tree (`<docsDir>/index.json`
 must already exist). It reports the count of errors and warnings, plus up to 20 violation lines. Fix
-errors before the next edit; a warning is a thing to go fix, not a reason to stop.
+errors before the next edit; a warning is a thing to go fix, not a reason to stop. The hooks run the engine the host repository installed (`node_modules/@puralex/ai-doc-system`), or the plugin's own copy only in a clone where `yaml` resolves; a plugin install is a bare clone, so on the vendored route both hooks are silent.
 
 ## Before you finish
 

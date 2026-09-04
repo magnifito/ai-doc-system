@@ -35,11 +35,11 @@ into an explicitly non-binding idea bank, and it is checkable by machine.
 | `advisory` | Non-blocking: dead `code:` pointers, `updated:`-versus-git drift, `state` docs whose code moved after `verified_on`. |
 | `fix` | Restamps `kind` and `module` across the tree after a move. |
 | `migrate` | One-shot: `git mv` into the tiers, stamp frontmatter, rewrite every tracked reference. Deleted after it runs. |
-| `hooks/` | Claude Code plugin hooks — a "not a commitment" reminder when a `reference` doc is read, and the gate's verdict after every doc edit. Neither ever blocks. |
+| `hooks/` | Claude Code plugin hooks — a "not a commitment" reminder when a `reference` doc is read, and the gate's verdict after every doc edit. Neither ever blocks. Both run the engine the host installed (`node_modules/@puralex/ai-doc-system`); with the scripts only vendored they stay silent. |
 | `schema/docs-system.config.schema.json` | JSON Schema for `docs-system.config.json`: editor completion and validation of every key. |
 | `scripts/docs-config.mjs` | Per-project configuration, with defaults that need no config file. |
 | `scripts/*.test.mjs` | The test suite, over throwaway fixture trees, some of them real git repositories. Wire it in — a suite no runner executes is green exactly once. |
-| `skills/` | Five skills an agent picks by situation: `docs-adopt` (first-time setup and migration), `docs-write` (add or edit a document), `docs-promote` (promote, move, supersede), `docs-audit` (periodic judgement: advisory, verify, impact), `docs-gate` (fix a red gate). |
+| `skills/` | Five skills an agent picks by situation: `docs-adopt` (first-time setup and migration), `docs-sort` (file and stamp documents other tools wrote), `docs-promote` (promote, move, supersede), `docs-audit` (periodic judgement: advisory, verify, impact), `docs-gate` (fix a red gate). |
 | `templates/` | The migration map to fill in, and the `docs/README.md` contract to adapt. |
 | `cli/cli.mjs` | Package entry point — `ai-doc-system init\|new\|mv\|check\|verify\|advisory\|impact\|context\|export\|gen\|fix\|migrate` — for npm-based installs. |
 | `docs/` | This repo's own gated tree; `engineering/design.md` is the full design: the problem, the rejected alternatives, and the limitations that survived implementation. |
@@ -168,6 +168,7 @@ npm install -D @puralex/ai-doc-system   # brings `yaml` with it
 npx ai-doc-system init                  # greenfield: docs/ contract + index + scripts, gate-clean
 npx ai-doc-system new docs/<tier>/<name>.md --title "Recurring invoices" --summary "How billing recurs"
 npx ai-doc-system mv docs/<tier>/<name>.md docs/<other-tier>/<name>.md   # promote: move, restamp, record
+npx ai-doc-system mv docs/<elsewhere>/<name>.md docs/<tier>/<name>.md --adopt   # sort a stray: move + stamp frontmatter
 npx ai-doc-system gen                   # regenerate INDEX.md and index.json
 npx ai-doc-system check                 # the blocking gate
 npx ai-doc-system check --json          # the same verdict as machine-readable JSON

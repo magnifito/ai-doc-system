@@ -22,4 +22,4 @@
 |---|---|---|---|
 | [Architecture round 2026-09: rule engine, impact, verify, hooks, transitions, context packs, and the debt backlog](plans/architecture-2026-09.md) | `active` | 2026-09-03 | The 2026-09 build plan — rule engine, impact, verify, hooks, transitions, context packs. |
 | [Technical debt and improvement backlog](plans/debt.md) | `active` | 2026-09-03 | Ranked defects and improvements found in a full read of the system on 2026-09-03. |
-| [Five skills under docs-notary](plans/skills-2026-09.md) | `active` | 2026-09-03 | Split the single root SKILL.md into five situation-triggered plugin skills under skills/, with a test that keeps them honest. |
+| [Five skills under docs-notary](plans/skills-2026-09.md) | `active` | 2026-09-04 | Split the single root SKILL.md into five situation-triggered plugin skills under skills/, with a test that keeps them honest. |

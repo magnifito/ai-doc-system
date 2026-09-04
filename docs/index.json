@@ -41,7 +41,7 @@
       "summary": "Split the single root SKILL.md into five situation-triggered plugin skills under skills/, with a test that keeps them honest.",
       "kind": "plan",
       "status": "active",
-      "updated": "2026-09-03",
+      "updated": "2026-09-04",
       "implements": "docs/plans/architecture-2026-09.md"
     }
   ],

@@ -1,6 +1,6 @@
 ---
 name: docs-promote
-description: Use when a document in a repository with docs/index.json must change authority or place — promote a captured reference document into product or engineering scope, move a file between tiers, take a plan from draft to active to shipped, supersede a document with a newer one, or retire one to archive. Drives ai-doc-system mv and the status transition rules that check --base enforces, and insists on the prose rewrite no command can do. Not for creating a document (docs-write) or a red gate (docs-gate).
+description: Use when a document in a repository with docs/index.json must change authority or place — promote a captured reference document into product or engineering scope, move a file between tiers, take a plan from draft to active to shipped, supersede a document with a newer one, or retire one to archive. Drives ai-doc-system mv and the status transition rules that check --base enforces, and insists on the prose rewrite no command can do. Not for a stray with no frontmatter (docs-sort) or a red gate (docs-gate).
 ---
 
 # Promote, move, or retire a document
@@ -12,7 +12,7 @@ a move is a claim, and `check --base` verifies the claim against the branch's hi
 
 Installed as a plugin, `docs-notary`'s `reference-read` hook says so on every Read of a document
 whose status is `reference`: not a commitment, never a build spec, and here is the `mv` that
-promotes it. Promote it first, then **rewrite the prose to describe this product**:
+promotes it. The hooks run the engine the host repository installed (`node_modules/@puralex/ai-doc-system`), or the plugin's own copy only in a clone where `yaml` resolves; a plugin install is a bare clone, so on the vendored route both hooks are silent. Promote it first, then **rewrite the prose to describe this product**:
 
 ```bash
 ai-doc-system mv docs/reference/<name>.md docs/product/<name>.md
@@ -66,8 +66,9 @@ When a newer document replaces an older one:
 2. Move it: `ai-doc-system mv docs/<tier>/<old-name>.md docs/archive/<old-name>.md`. The
    `archive/` tier forces `status: superseded`. The prose stays as it was — an archived document is
    a record, and `check --base` owes it no rewrite.
-3. Fix every link that pointed at it — the gate will not catch these; `link` only fails a target
-   that is missing.
+3. Fix every link that pointed at it. The gate catches a link still naming the old path (`link`:
+   the target is gone) but not one you retarget at the archived copy — `link` never reads a
+   target's status, so a pointer at a superseded document is yours to notice.
 
 A document whose own first line says SUPERSEDED belongs in `archive/` whatever its frontmatter
 says. A "closed" plan that still lists untaken steps is a live backlog and stays `active`.
@@ -76,8 +77,8 @@ says. A "closed" plan that still lists untaken steps is a live backlog and stays
 
 A rename inside one tier keeps status and needs no `promoted_from`; `mv` handles it, and sets
 `updated` to today as it does on any move. After a move made by hand, `ai-doc-system fix` restamps
-`kind` and `module` — the gate asserts they agree with the path. Renaming for case alone needs
-**two** `git mv`s through a temporary name on macOS and Windows.
+`kind` and `module` — the gate asserts they agree with the path. `git mv` renames for case alone in
+one step. A file with no frontmatter at all is a stray, not a move: docs-sort.
 
 ## 5. Before you finish
 

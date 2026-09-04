@@ -99,7 +99,7 @@ export const LIST_FIELDS = new Set(['evidence', 'changes'])
 export const SCALAR_FIELDS = FIELD_ORDER.filter((field) => !LIST_FIELDS.has(field))
 
 /** Quote a scalar only when leaving it bare would change how YAML reads it. */
-function scalar(value) {
+export function scalar(value) {
   const text = String(value)
   return /^[A-Za-z0-9][A-Za-z0-9 ._\-/]*$/.test(text) ? text : JSON.stringify(text)
 }

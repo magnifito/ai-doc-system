@@ -406,3 +406,22 @@ test('a promoted_from naming a path that existed nowhere is still reported, comm
     rmSync(root, { recursive: true, force: true })
   }
 })
+
+test('a stray sorted into a tier from a path under no tier is adoption, not promotion', () => {
+  const body = '# Feature X plan\n\nSteps, at length: several sentences of plan that another skill wrote\nunder a path the tiering does not know, and that sorting must keep verbatim.\n'
+  const root = gitFixture({ 'docs/superpowers/plans/2026-09-04-feature-x.md': body, 'docs/product/y.md': fm('active') })
+  try {
+    regen(root)
+    commitAll(root)
+    mkdirSync(join(root, 'docs/plans'), { recursive: true })
+    execFileSync('git', ['mv', 'docs/superpowers/plans/2026-09-04-feature-x.md', 'docs/plans/feature-x.md'], { cwd: root, stdio: 'pipe' })
+    writeFileSync(
+      join(root, 'docs/plans/feature-x.md'),
+      `---\ntitle: Feature X plan\nkind: plan\nstatus: draft\nupdated: 2026-09-04\n---\n${body}`,
+    )
+    regen(root)
+    assert.deepEqual(promotionRules(checkDocs(root, undefined, { base: 'HEAD' })), [])
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
