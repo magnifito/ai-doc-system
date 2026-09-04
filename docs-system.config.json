@@ -1,13 +1,4 @@
 {
-  "referenceScanExclude": [
-    ".claude",
-    ".agents",
-    "_bmad",
-    "skills-lock.json",
-    "scripts/*.test.mjs",
-    ".github",
-    "docs-migration.map.mjs",
-    "templates",
-    "site"
-  ]
+  "$schema": "./schema/docs-system.config.schema.json",
+  "referenceScanExclude+": [".github", "templates", "site"]
 }

@@ -30,8 +30,14 @@ this tree blind.** [\`INDEX.md\`](INDEX.md) is the same data for humans. Both ar
 | \`plans/\` | \`plan\` | Work in flight. |
 | \`archive/\` | \`archive\` | Replaced — every file here is \`status: superseded\` and names its replacement. |
 
-Every \`.md\` here carries YAML frontmatter (\`title\`, \`kind\`, \`status\`, \`updated\`); the
-\`lint:docs\` script is the blocking gate that keeps all of it true.
+Every \`.md\` here carries YAML frontmatter (\`title\`, \`kind\`, \`status\`, \`updated\`, and an
+optional one-line \`summary\`); the \`lint:docs\` script is the blocking gate that keeps all of it
+true.
+
+Do not hand-write that block. \`ai-doc-system new <path> --title "…" --summary "…"\` writes a
+document that passes the gate on its first run, and \`ai-doc-system mv <from> <to>\` moves one
+between tiers — restamping \`kind\` and \`status\`, recording \`promoted_from\`. Both regenerate the
+index.
 
 This tree is managed by [ai-doc-system](https://github.com/magnifito/ai-doc-system).
 `
@@ -40,6 +46,7 @@ const SCRIPTS = {
   'lint:docs': 'ai-doc-system check',
   'lint:docs:advisory': 'ai-doc-system advisory',
   'gen:docs-index': 'ai-doc-system gen',
+  'docs:impact': 'ai-doc-system impact',
 }
 
 export function initDocs(root, config = loadConfig(root)) {

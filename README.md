@@ -25,16 +25,24 @@ into an explicitly non-binding idea bank, and it is checkable by machine.
 
 | Piece | What it does |
 |---|---|
-| `scripts/check-docs.mjs` | The gate. Nine assertions, exits 1 on any violation. Wire it in as `lint:docs`. |
-| `scripts/gen-docs-index.mjs` | Generates `docs/INDEX.md` (humans) and `docs/index.json` (agents). |
-| `scripts/check-docs-advisory.mjs` | Non-blocking: dead `code:` pointers, `updated:`-versus-git drift. |
-| `scripts/migrate-docs.mjs` | One-shot: `git mv` into the tiers, stamp frontmatter, rewrite every tracked reference. Deleted after it runs. |
+| `check` | The gate. Every violation carries a rule id and a severity; errors exit 1, warnings never do. Wire it in as `lint:docs`. |
+| `gen` | Generates `docs/INDEX.md` (humans) and `docs/index.json` (agents, with the `by_code` reverse map). |
+| `new <path>` | Writes a document that passes the gate on its first run — `kind` from the path, the tier's forced status where the tier has one, else `--status`, else `draft`, today's date — and regenerates the index. |
+| `mv <from> <to>` | The mechanical half of a promotion: `git mv`, restamp `kind`/`module`/`status`, restamp `updated` to today, record `promoted_from`, regenerate. The prose rewrite stays yours. |
+| `verify` | Runs command-form `evidence`, hashes path-form evidence into `docs/evidence-lock.json`, and with `--stamp` sets `verified_on`. Explicit invocation only — see below. |
+| `impact` | The reverse question: which documents claim the paths this change touched. Advisory, exits 0 (2 only on a malformed `--base`), writes to the GitHub step summary. |
+| `context` / `export` | Documents with an `AUTHORITY:` banner inside a budget — whole documents are dropped, never truncated, and the first document is always emitted whole — and the same selection as JSONL (one record per heading) for RAG stores. |
+| `advisory` | Non-blocking: dead `code:` pointers, `updated:`-versus-git drift, `state` docs whose code moved after `verified_on`. |
+| `fix` | Restamps `kind` and `module` across the tree after a move. |
+| `migrate` | One-shot: `git mv` into the tiers, stamp frontmatter, rewrite every tracked reference. Deleted after it runs. |
+| `hooks/` | Claude Code plugin hooks — a "not a commitment" reminder when a `reference` doc is read, and the gate's verdict after every doc edit. Neither ever blocks. |
+| `schema/docs-system.config.schema.json` | JSON Schema for `docs-system.config.json`: editor completion and validation of every key. |
 | `scripts/docs-config.mjs` | Per-project configuration, with defaults that need no config file. |
 | `scripts/*.test.mjs` | The test suite, over throwaway fixture trees, some of them real git repositories. Wire it in — a suite no runner executes is green exactly once. |
 | `SKILL.md` | The agent-facing procedure, including the judgement calls the mechanics do not cover. |
 | `templates/` | The migration map to fill in, and the `docs/README.md` contract to adapt. |
-| `cli/cli.mjs` | Package entry point — `ai-doc-system init\|check\|gen\|fix\|advisory\|migrate` — for npm-based installs. |
-| `docs/` | This repo's own gated tree; `engineering/design.md` is the full design: the problem, the two rejected alternatives, and the limitations that survived implementation. |
+| `cli/cli.mjs` | Package entry point — `ai-doc-system init\|new\|mv\|check\|verify\|advisory\|impact\|context\|export\|gen\|fix\|migrate` — for npm-based installs. |
+| `docs/` | This repo's own gated tree; `engineering/design.md` is the full design: the problem, the rejected alternatives, and the limitations that survived implementation. |
 
 Plain ESM, Node 20+, one dependency: the `yaml` package — frontmatter holds lists and colon-bearing
 scalars that a hand-rolled parser mangled. Installing into a host repo means copying the scripts
@@ -51,12 +59,13 @@ docs/
   reference/     # captured from elsewhere. NEVER a build spec.      status: reference
   product/       # committed scope
   engineering/   # how this repository works        (+ adr/, runbooks/)
-  plans/         # work in flight                   (+ done/)
+  plans/         # work in flight
   archive/       # replaced                                          status: superseded
 ```
 
 `kind` is **derived from the path** and mirrored in frontmatter — moving a file between tiers is
-what changes its kind: `git mv`, then `fix-docs-frontmatter.mjs` to restamp the stored copy.
+what changes its kind: `ai-doc-system mv` does the move and the restamp together, and `ai-doc-system
+fix` restamps a move made by hand.
 
 Change any of it in `docs-system.config.json`; a project whose answers are the defaults ships no
 config file at all.
@@ -65,21 +74,27 @@ config file at all.
 
 ```yaml
 ---
-title: Recurring Invoices   # required
-kind: reference             # required — must equal what the path implies
-module: billing             # required when the project declares modules
-status: reference           # required — reference | draft | active | shipped | superseded
-updated: 2026-05-29         # required — ISO date, bumped by the author of a substantive edit
+title: Recurring Invoices             # required
+summary: How recurring invoices bill  # optional, one line — rides into the index and every pack
+kind: reference                       # required — must equal what the path implies
+module: billing                       # required when the project declares modules
+status: reference                     # required — reference | draft | active | shipped | superseded
+updated: 2026-05-29                   # required — ISO date, bumped by the author of a substantive edit
+source_url: https://example.com/docs  # optional — where a captured document came from
 ---
 ```
 
-Optional: `implements:` (validated when present), `code:`. Required on `superseded`:
-`superseded_by:`, whose target must exist.
+A `title:` or `summary:` containing a colon has to be YAML-quoted; the gate reports the parse
+failure, but quoting it up front is cheaper than reading the error.
+
+Optional and validated when present: `implements:`, `code:`, `source_url:`, `review_by:` (an ISO
+date that warns once it is in the past), `promoted_from:` (written by `mv`). Required on
+`superseded`: `superseded_by:`, whose target must exist.
 
 `kind` and `module` are derived from the path **and** stored, and the gate rejects a document where
 the two disagree. Storing them is what lets a document say what it is when it is read outside the
-tree; the assertion is what stops the duplicate drifting. After moving files, run
-`fix-docs-frontmatter.mjs` to restamp both.
+tree; the assertion is what stops the duplicate drifting. After moving files by hand, run
+`ai-doc-system fix` to restamp both.
 
 ### The optional module axis
 
@@ -106,22 +121,39 @@ unaffected by any of this.
 
 ## What the gate asserts
 
-1. Frontmatter present and parseable outside the exempt list.
-2. Closed vocabularies — `status` in its set, `title`/`updated` present, dates ISO-formatted, status
-   agrees with the tier **in both directions**, `implements` names a file that exists.
-3. Path hygiene and naming — kebab-case directories; kebab-case basenames except a closed set of
-   sentinels (`README`, `INDEX`, `STATUS`, `ROADMAP`, `PRD`, …) and any programme prefix the project
-   declares. Hygiene alone would let `scrum-tasks.md` and `SCRUM-TASKS.md` both be legal; the naming
-   half is what stops that. Links resolve case-exactly on every path segment, so a rename does not
-   "pass" on macOS and break on Linux.
-4. Index freshness — regenerated in memory and compared byte-for-byte with what is committed.
-5. No dead `.md` links — inline and reference-style, inside the tree and from every tracked file
-   outside it.
-6. `status: superseded` implies a `superseded_by:` whose target exists.
-7. `kind` and `module` are present and agree with what the path implies.
-8. Per-kind required fields, closed vocabularies for optional scalars, every `evidence` entry a
-   live path or a runnable command, every `changes` target a live `state` document.
-9. No two documents in one tier (and module) share a basename — sentinels excepted.
+Every violation carries a **rule id** and a severity. Errors fail the run; warnings print in full
+and never change the exit code, so a rule can be adopted before it is enforced.
+
+| Rule | Default | Fires when |
+|---|---|---|
+| `frontmatter` | error | no `---` block outside the exempt list, or one that is not valid YAML |
+| `required` | error | a required field is missing or empty — `title`, `status`, `updated`, `kind`, `module`, plus any per-kind `requiredFields` |
+| `vocabulary` | error | `status` outside its set, `kind`/`module` disagreeing with the path (in both directions), an unregistered module, a scalar written as a list or map |
+| `date` | error | `updated`, `verified_on` or `review_by` is not an ISO date |
+| `path` | error | a non-kebab directory, or a basename that is neither kebab-case nor a declared sentinel (`README`, `INDEX`, `STATUS`, `ROADMAP`, `PRD`, …) or programme prefix |
+| `basename` | error | two documents in one tier (and module) share a basename — sentinels excepted |
+| `link` | error | a dead `.md` link (inline or reference-style) inside the tree, or a dead docs path in a tracked file outside it. Every segment is matched case-exactly, so a rename cannot "pass" on macOS and break on Linux |
+| `implements` | error | `implements` names a file that does not exist |
+| `superseded` | error | `status: superseded` with no `superseded_by`, or one pointing at nothing |
+| `evidence` | error | an `evidence` entry is neither a live path nor a command starting with a known runner |
+| `changes` | error | a `changes` entry names something that does not exist, or names a document that is not `kind: state`. A missing `changes` field is `required`, not this |
+| `source-url` | error | `source_url` is not an `http(s)` URL |
+| `summary` | error | `summary` is present but empty, or spans more than one line |
+| `index` | error | `INDEX.md` or `index.json` differs from what the generator would write |
+| `transition` | error | **(`--base` only)** a `status` moved along an edge the lifecycle does not have |
+| `promoted-verbatim` | error | **(`--base` only)** a "promotion" that copied instead of moving, a cross-tier move with no `promoted_from`, or prose nobody rewrote |
+| `evidence-lock` | warn | path evidence changed, or its line vanished, since `verify` hashed it |
+| `shipped-code` | warn | `status: shipped` with no `code:` naming the implementation |
+| `upstream` | warn | the `implements` target has a later `updated` than the document deriving from it |
+| `review` | warn | `review_by` has passed |
+| `updated-drift` | warn | *(advisory pass)* the file's last commit is later than its `updated` |
+| `code-pointer` | warn | *(advisory pass)* a `code:` pointer no longer resolves |
+| `verification-drift` | warn | *(advisory pass)* a `state` document's `code:` changed after its `verified_on` |
+
+Change any severity in `docs-system.config.json` — `{"rules": {"shipped-code": "error", "upstream":
+"off"}}` — and `off` drops the rule. One caveat: a document whose frontmatter is missing or
+unparseable is skipped by every other check, so `frontmatter: off` silences the message without
+restoring the checks behind it.
 
 And what it deliberately does **not** assert — document age, prose style, whether `code:` still
 resolves, whether `updated:` matches git — is argued in [`docs/engineering/design.md`](docs/engineering/design.md)
@@ -134,19 +166,68 @@ From npm:
 ```bash
 npm install -D @puralex/ai-doc-system   # brings `yaml` with it
 npx ai-doc-system init                  # greenfield: docs/ contract + index + scripts, gate-clean
+npx ai-doc-system new docs/<tier>/<name>.md --title "Recurring invoices" --summary "How billing recurs"
+npx ai-doc-system mv docs/<tier>/<name>.md docs/<other-tier>/<name>.md   # promote: move, restamp, record
 npx ai-doc-system gen                   # regenerate INDEX.md and index.json
 npx ai-doc-system check                 # the blocking gate
+npx ai-doc-system check --json          # the same verdict as machine-readable JSON
+npx ai-doc-system check --all           # print every error, not the first 100 (warnings always print in full)
+npx ai-doc-system check --base origin/main    # + the history-aware rules, over what this branch changed
+npx ai-doc-system verify --only docs/<tier>/<name>.md --stamp   # run the evidence, then stamp verified_on
+npx ai-doc-system impact --base origin/main   # which documents claim the changed paths
+npx ai-doc-system context --kind product --status active --max-chars 40000
+npx ai-doc-system export --status shipped > docs.jsonl
 npx ai-doc-system advisory              # non-blocking drift report
+npx ai-doc-system fix                   # restamp kind/module after moves
 ```
+
+**Upgrade step:** run `ai-doc-system gen` once after upgrading — `index.json` gains `by_code` and
+`INDEX.md` a Summary column, and the `index` rule compares bytes.
+
+`check --base <ref>` resolves the merge base of `<ref>` and `HEAD`, judges only the documents the
+branch changed since then (uncommitted work included), and adds the two rules that need history —
+`transition` and `promoted-verbatim`. A ref that does not resolve exits 2 rather than quietly
+checking less than it says, so on a shallow CI checkout fetch it first.
+
+In CI, `--format github` turns each violation into an annotation on the offending file (there are no
+line numbers yet), and `impact` posts the documents a pull request may have falsified into the job
+summary:
+
+```yaml
+- run: npx ai-doc-system check --format github --base origin/${{ github.base_ref || 'main' }}
+- run: npx ai-doc-system impact --base origin/${{ github.base_ref || 'main' }}
+```
+
+**`verify` is the only command that executes anything written in a document.** Command-form
+`evidence` entries are run through the shell; that never happens from `check`, from CI, or from the
+hooks — an author invokes it deliberately. **Never run `verify` on a branch you have not read:** an
+`evidence:` line is a command a document's author chose, and running it is running their code.
+Path-form entries are hashed into `docs/evidence-lock.json` instead, which is what lets the gate
+warn (`evidence-lock`) when the evidence under a claim moved.
+
+Configuration is optional. When there is a `docs-system.config.json`, point its `$schema` at the
+published schema for editor completion, and use a `key+` suffix to *extend* an array default rather
+than replacing it:
+
+```json
+{
+  "$schema": "https://raw.githubusercontent.com/magnifito/ai-doc-system/main/schema/docs-system.config.schema.json",
+  "evidenceRunners+": ["bazel"],
+  "rules": { "shipped-code": "error" }
+}
+```
+
+Setting both `key` and `key+` is an error — whichever the author meant, key order in the file would
+decide it silently.
 
 Or install as a Claude Code plugin and let an agent drive it:
 
 ```
 /plugin marketplace add magnifito/ai-doc-system
-/plugin install ai-doc-system@magnifito
+/plugin install docs-notary@magnifito
 ```
 
-(A plain `git clone https://github.com/magnifito/ai-doc-system ~/.claude/skills/ai-doc-system`
+(A plain `git clone https://github.com/magnifito/ai-doc-system ~/.claude/skills/docs-notary`
 also works — the repo carries its own `.claude-plugin/plugin.json`.)
 
 Then, in the target repository, ask for the documentation system. [`SKILL.md`](SKILL.md) is the
@@ -165,11 +246,26 @@ node scripts/gen-docs-index.mjs && node scripts/check-docs.mjs
 rm docs-migration.map.mjs scripts/migrate-docs.mjs
 ```
 
+## It gates itself
+
+This repository runs its own gate on its own documentation, on every push, on Linux, macOS and
+Windows. `docs/` here is a real tiered tree: the design record lives in `engineering/`, the
+backlog and the implementation plans live in `plans/`, every file carries validated frontmatter,
+and `docs/index.json` is regenerated and byte-compared in CI. If the gate ever lets a defect
+through, it lets it through here first.
+
+That is not a slogan. During the 2026-09 refactor the gate failed the authors' own commits twice:
+once for a JSDoc example that named a docs path that does not exist (in a tracked file, which is
+exactly assertion 5b), and once for a CLI usage string that spelled a placeholder path as if it
+were real. Then it failed a third time, on the first draft of this very paragraph, which quoted
+the placeholder verbatim. All three were caught before the push landed, by the check this package
+ships. A tool that cannot survive its own rules has no business enforcing them on yours.
+
 ## Provenance
 
 Designed and first applied to a 301-document monorepo in August 2026, where 208 of those documents
 were captured from elsewhere and indistinguishable from committed scope until this ran.
-[`docs/engineering/design.md`](docs/engineering/design.md) carries the reasoning, the two rejected alternatives,
+[`docs/engineering/design.md`](docs/engineering/design.md) carries the reasoning, the rejected alternatives,
 and the limitations that survived implementation.
 
 ## License

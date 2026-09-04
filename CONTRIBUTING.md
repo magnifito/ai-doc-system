@@ -20,7 +20,7 @@ Thanks for considering a contribution.
 git clone https://github.com/magnifito/ai-doc-system.git
 cd ai-doc-system
 npm ci
-npm test                      # 95 tests, throwaway fixture trees
+npm test                      # throwaway fixture trees
 npm run lint:docs             # the gate, against this repo's own docs/
 ```
 

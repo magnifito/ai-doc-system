@@ -1,5 +1,5 @@
 ---
-name: ai-doc-system
+name: docs-notary
 description: Use when a repository's docs/ tree is unnavigable, misleading, or unenforced — when an agent cannot tell whether a document describes something the product has, has committed to, or will never build. Tiers docs/ by authority, puts validated frontmatter on every file, generates an agent-readable index, and adds a blocking gate. Also use to add a document to a tree that already has this system, or to promote a reference document into committed scope.
 ---
 
@@ -61,21 +61,31 @@ install yaml`, or the host's package manager equivalent) — without it every sc
 
 If the target's answers differ from the defaults, write `docs-system.config.json` at its root —
 `docsDir`, `tiers`, `statuses`, `tierStatus`, `exempt`, `tierOrder`, `indexSubdivide`,
-`referenceScanExclude`. A project whose answers **are** the defaults ships no config file. Unknown
-keys are rejected, so a typo cannot silently do nothing.
+`referenceScanExclude`, and `rules` (per-rule severity: `error`, `warn` or `off`). Point `$schema` at
+`schema/docs-system.config.schema.json` for completion, and use a `key+` suffix to extend an array
+default instead of replacing it. A project whose answers **are** the defaults ships no config
+file. Unknown keys are rejected, so a typo cannot silently do nothing.
 
-Wire up four scripts:
+Wire up five scripts:
 
 ```jsonc
 "lint:docs":          "node scripts/check-docs.mjs",
 "lint:docs:advisory": "node scripts/check-docs-advisory.mjs",  // non-blocking
 "gen:docs-index":     "node scripts/gen-docs-index.mjs",
+"docs:impact":        "node scripts/impact-docs.mjs",          // non-blocking
 "test:scripts":       "node --test scripts/*.test.mjs"
 ```
 
 `lint:docs` and `test:scripts` go in the blocking gate — cheap, so put them before the type checks.
 `lint:docs:advisory` goes wherever the project keeps non-blocking checks. **Wire the tests too:** a
 suite no runner executes is green exactly once.
+
+On pull requests, add two more steps. `check --format github --base origin/<default>` is
+**blocking** — it exits 1 on any error, exactly as a plain `check` does — and it annotates the
+offending file (there are no line numbers yet) and adds the two history-aware rules (`transition`,
+`promoted-verbatim`). `impact --base origin/<default>` lists the documents whose claims cover the
+changed paths, into the job summary; `impact` is the one that always exits 0 (2 only on a malformed `--base`) — it reports, it does
+not judge.
 
 ## 3. Migrate
 
@@ -105,12 +115,26 @@ Then, in this order:
 
 ## 4. Rules that outlive the migration
 
-- **Nothing in `reference/` may be implemented directly.** Promote it first — `git mv` into
-  `product/`, restatus, and **rewrite the prose to describe this product**. Promoting a captured
-  document verbatim is how someone else's assumptions become your requirements.
+- **Nothing in `reference/` may be implemented directly.** Promote it first —
+  `ai-doc-system mv docs/reference/<name>.md docs/product/<name>.md`, then **rewrite the prose to
+  describe this product**. Promoting a captured document verbatim is how someone else's assumptions
+  become your requirements. (A bare `git mv` writes no `promoted_from` and fails
+  `promoted-verbatim` under `check --base`.)
+- **Add a document with `ai-doc-system new <path> --title … --summary …`.** It derives `kind` from
+  the path, takes the tier's forced status where the tier has one, else `--status`, else `draft`,
+  stamps today, and regenerates the index — so the document passes the gate on its first run.
+  Hand-written frontmatter is where most gate failures come from.
+- **Move or promote with `ai-doc-system mv <from> <to>`** — it restamps `kind`, `module`, `status`
+  and `updated` (to today: a promotion is a substantive change, and the prose rewrite is mandatory),
+  and records `promoted_from`; you still rewrite the prose. That field is what lets `check --base`
+  tell a promotion from a copy, and the prose rewrite is the half no command can do.
 - **`kind` and `module` are derived from the path AND stored, and the gate asserts they agree.**
-  Moving a file between tiers changes what the path implies; run `fix-docs-frontmatter.mjs` after
-  any move to restamp both fields. (The migration stamps them itself.)
+  Moving a file between tiers changes what the path implies; after a move made by hand, run
+  `ai-doc-system fix` to restamp both fields. (The migration stamps them itself.)
+- **Hand a document to another agent, or to a RAG store, with `ai-doc-system context` / `export`,
+  never `cat`.** Both put the `AUTHORITY:` line on every document — and `export` on every heading
+  chunk — so a `reference` document that leaves the tree still says it is not a commitment.
+  `context --kind … --status … --max-chars N` keeps a pack inside a budget.
 - **`INDEX.md` and `index.json` are generated.** Fix a stale one with `gen:docs-index`, never by hand.
 - **`updated:` is human-maintained** — the author of a substantive edit bumps it. Nothing derives it
   from git, because the git date moves on every whitespace commit.
@@ -123,6 +147,11 @@ The migration is the easy half. These are the calls that decide whether the resu
 - **Never stamp `shipped` on the strength of a plan's own prose.** A plan that says "✅ EXECUTED" is
   making a claim, not reporting a verified fact. Migrate every plan `active` and hand the user a
   list of the completion claims nobody checked. Auditing them is separate work with a separate cost.
+- **Before claiming a state document is current, run `ai-doc-system verify --only <path> --stamp`.**
+  It runs the document's command evidence, hashes its path evidence, and stamps `verified_on` only
+  where everything passed — a date you can defend instead of one you typed. It is the only command
+  that executes anything written in a document, so it is never wired into the gate, into CI or into
+  a hook: invoke it deliberately, and read the evidence lines of an untrusted document first.
 - **A document whose own first line says SUPERSEDED belongs in `archive/`**, whatever its
   frontmatter says. That is evidence, not tidiness.
 - **A "closed" plan that still lists untaken steps is a live backlog.** It does not belong in

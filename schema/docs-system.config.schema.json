@@ -1,0 +1,95 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://raw.githubusercontent.com/magnifito/ai-doc-system/main/schema/docs-system.config.schema.json",
+  "title": "ai-doc-system configuration",
+  "description": "Per-project overrides for the documentation gate. Every key defaults to the value in scripts/docs-config.mjs; an array key may instead be written as \"<key>+\" to append to that default rather than replace it.",
+  "type": "object",
+  "additionalProperties": false,
+  "definitions": {
+    "stringArray": { "type": "array", "items": { "type": "string" } },
+    "tier": {
+      "type": "array",
+      "description": "[prefix, kind]; the prefix is relative to docsDir and must end with \"/\".",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": [
+        { "type": "string", "pattern": "/$" },
+        { "type": "string" }
+      ]
+    },
+    "tiers": { "type": "array", "items": { "$ref": "#/definitions/tier" } },
+    "module": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key", "class"],
+      "properties": {
+        "key": { "type": "string" },
+        "class": { "enum": ["core", "anchor", "addon"] },
+        "requires": { "$ref": "#/definitions/stringArray" }
+      }
+    },
+    "modules": { "type": "array", "items": { "$ref": "#/definitions/module" } }
+  },
+  "properties": {
+    "$schema": { "type": "string" },
+
+    "docsDir": { "type": "string", "description": "Directory holding the documentation tree, relative to the repo root." },
+
+    "rules": {
+      "type": "object",
+      "description": "Per-rule severity overrides. Unknown rule ids are rejected by the loader.",
+      "additionalProperties": { "enum": ["error", "warn", "off"] }
+    },
+
+    "evidenceRunners": { "$ref": "#/definitions/stringArray", "description": "Command names an evidence entry may start with." },
+    "evidenceRunners+": { "$ref": "#/definitions/stringArray", "description": "Runners to append to the default list." },
+
+    "tiers": { "$ref": "#/definitions/tiers", "description": "Ordered [prefix, kind] pairs; first match wins." },
+    "tiers+": { "$ref": "#/definitions/tiers", "description": "Tiers to append to the default list." },
+
+    "moduleRoot": { "type": "string", "description": "Where per-module trees live, relative to docsDir." },
+    "platformKey": { "type": "string", "description": "Reserved module key for everything cross-cutting." },
+
+    "modules": { "$ref": "#/definitions/modules", "description": "The closed set of product modules." },
+    "modules+": { "$ref": "#/definitions/modules", "description": "Modules to append to the default list." },
+
+    "requiredFields": {
+      "type": "object",
+      "description": "Extra frontmatter fields a kind demands, keyed by kind.",
+      "additionalProperties": { "$ref": "#/definitions/stringArray" }
+    },
+
+    "vocabularies": {
+      "type": "object",
+      "description": "Closed value sets for optional scalar fields, keyed by field name.",
+      "additionalProperties": { "$ref": "#/definitions/stringArray" }
+    },
+
+    "statuses": { "$ref": "#/definitions/stringArray", "description": "Closed status vocabulary." },
+    "statuses+": { "$ref": "#/definitions/stringArray", "description": "Statuses to append to the default list." },
+
+    "tierStatus": {
+      "type": "object",
+      "description": "Tier kind -> the only status its documents may carry.",
+      "additionalProperties": { "type": "string" }
+    },
+
+    "exempt": { "$ref": "#/definitions/stringArray", "description": "Files exempt from frontmatter, relative to docsDir." },
+    "exempt+": { "$ref": "#/definitions/stringArray", "description": "Exemptions to append to the default list." },
+
+    "sentinels": { "$ref": "#/definitions/stringArray", "description": "ALL-CAPS basenames allowed to shout." },
+    "sentinels+": { "$ref": "#/definitions/stringArray", "description": "Sentinels to append to the default list." },
+
+    "allowedBasenamePrefixes": { "$ref": "#/definitions/stringArray", "description": "ALL-CAPS prefixes for named programmes." },
+    "allowedBasenamePrefixes+": { "$ref": "#/definitions/stringArray", "description": "Prefixes to append to the default list." },
+
+    "tierOrder": { "$ref": "#/definitions/stringArray", "description": "Kind order in the generated INDEX.md." },
+    "tierOrder+": { "$ref": "#/definitions/stringArray", "description": "Kinds to append to the default order." },
+
+    "indexSubdivide": { "$ref": "#/definitions/stringArray", "description": "Kinds whose INDEX.md section is split per area." },
+    "indexSubdivide+": { "$ref": "#/definitions/stringArray", "description": "Kinds to append to the default list." },
+
+    "referenceScanExclude": { "$ref": "#/definitions/stringArray", "description": "Git pathspecs excluded from the tracked-reference scan." },
+    "referenceScanExclude+": { "$ref": "#/definitions/stringArray", "description": "Pathspecs to append to the default list." }
+  }
+}

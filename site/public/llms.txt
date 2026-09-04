@@ -17,7 +17,8 @@ promote it into `product/` first.
 ## Docs
 
 - [README](https://github.com/magnifito/ai-doc-system/blob/main/README.md): what you get, the
-  default tiers, the frontmatter schema, the nine gate assertions, install routes.
+  default tiers, the frontmatter schema, the rule table with each rule's default severity, install
+  routes.
 - [SKILL.md](https://github.com/magnifito/ai-doc-system/blob/main/SKILL.md): the agent-facing
   procedure — survey, install, migrate, and the judgement calls the mechanics do not cover.
 - [Design](https://github.com/magnifito/ai-doc-system/blob/main/docs/engineering/design.md): the
@@ -26,5 +27,10 @@ promote it into `product/` first.
 ## Package
 
 - [npm: @puralex/ai-doc-system](https://www.npmjs.com/package/@puralex/ai-doc-system): CLI commands
-  `init`, `check`, `gen`, `fix`, `advisory`, `migrate`. Node 20+, one dependency (`yaml`).
+  `init` (greenfield tree), `new <path>` (a gate-clean document), `mv <from> <to>` (promotion: move,
+  restamp, record `promoted_from`), `check` (the blocking gate; `--json`, `--format github`,
+  `--base <ref>` for the history-aware rules), `verify` (runs command evidence, hashes path evidence,
+  `--stamp` sets `verified_on`), `impact` (which documents claim the changed paths), `context` and
+  `export` (documents with an authority banner; JSONL per heading for RAG), `gen`, `fix`, `advisory`,
+  `migrate`. Node 20+, one dependency (`yaml`).
 - [GitHub](https://github.com/magnifito/ai-doc-system): Apache-2.0.

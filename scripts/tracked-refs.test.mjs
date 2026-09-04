@@ -17,7 +17,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import test from 'node:test'
 import { clearConfigCache } from './docs-config.mjs'
-import { trackedDocRefs } from './check-docs.mjs'
+import { checkDocs, trackedDocRefs } from './check-docs.mjs'
 
 /** A committed git repository containing exactly `files`. */
 function gitFixture(files) {
@@ -106,6 +106,54 @@ test('the exclusion list is configurable per project', () => {
     (root) => {
       // vendor/ is excluded by the override; the test file no longer is.
       assert.deepEqual([...trackedDocRefs(root)], ['docs/fixture-only.md'])
+    },
+  )
+})
+
+test('a docs path inside a URL is not a reference to this repository', () => {
+  withGitFixture(
+    {
+      'CLAUDE.md': 'See https://github.com/magnifito/ai-doc-system/blob/main/docs/engineering/design.md and docs/engineering/local.md\n',
+      'docs/engineering/local.md': '---\ntitle: L\nkind: engineering\nstatus: active\nupdated: 2026-08-17\n---\n# L\n',
+    },
+    (root) => {
+      const refs = trackedDocRefs(root)
+      assert.ok(refs.has('docs/engineering/local.md'))
+      assert.ok(!refs.has('docs/engineering/design.md'))
+    },
+  )
+})
+
+test('a leading ./ is a reference to this tree; ../ and URLs are not', () => {
+  withGitFixture(
+    {
+      'README.md': [
+        '[here](./docs/engineering/local.md)',
+        '[up](../docs/engineering/design.md)',
+        '[web](https://github.com/magnifito/ai-doc-system/blob/main/docs/engineering/design.md)',
+        '',
+      ].join('\n'),
+      'docs/engineering/local.md': DOC,
+    },
+    (root) => {
+      assert.deepEqual([...trackedDocRefs(root)], ['docs/engineering/local.md'])
+    },
+  )
+})
+
+test('an installed dependency is somebody else\'s repository, not a dead pointer in this one', () => {
+  withGitFixture(
+    {
+      'docs/engineering/testing.md': DOC,
+      // A vendored copy of this very package: its templates and tests name
+      // `docs/...` paths that are deliberately absent from the host tree.
+      'node_modules/@puralex/ai-doc-system/templates/docs-README.template.md':
+        'Write it at docs/product/example.md and run the gate.\n',
+      'src/app.ts': '// See docs/engineering/testing.md for the suite.\n',
+    },
+    (root) => {
+      assert.deepEqual([...trackedDocRefs(root)], ['docs/engineering/testing.md'])
+      assert.deepEqual(checkDocs(root).filter((violation) => violation.rule === 'link'), [])
     },
   )
 })

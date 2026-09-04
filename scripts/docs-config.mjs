@@ -14,6 +14,43 @@ import { join } from 'node:path'
 export const CONFIG_FILE = 'docs-system.config.json'
 
 /**
+ * Every rule the gate and the advisory pass know, with its default severity.
+ * `error` fails the gate, `warn` is printed and never fails, `off` is silent.
+ * A project overrides one id at a time in `rules`; unknown ids are rejected so
+ * a typo cannot silently leave a rule at its default.
+ */
+export const RULES = {
+  frontmatter: 'error',
+  required: 'error',
+  vocabulary: 'error',
+  date: 'error',
+  path: 'error',
+  basename: 'error',
+  link: 'error',
+  implements: 'error',
+  superseded: 'error',
+  evidence: 'error',
+  'evidence-lock': 'warn',
+  changes: 'error',
+  'source-url': 'error',
+  summary: 'error',
+  index: 'error',
+  transition: 'error',
+  'promoted-verbatim': 'error',
+  'shipped-code': 'warn',
+  upstream: 'warn',
+  review: 'warn',
+  // Advisory-only: reported by the advisory pass, never evaluated by the gate.
+  // `off` silences the corresponding report block.
+  'updated-drift': 'warn',
+  'code-pointer': 'warn',
+  'verification-drift': 'warn',
+}
+
+/** The severities a rule may carry. */
+export const SEVERITIES = ['error', 'warn', 'off']
+
+/**
  * The defaults are the tiering this system was designed against: documents
  * grouped by AUTHORITY (how much weight a reader should give them), not topic.
  * Change `tiers` and you change what `kind` a path implies — nothing else.
@@ -21,6 +58,19 @@ export const CONFIG_FILE = 'docs-system.config.json'
 export const DEFAULTS = {
   /** Directory holding the documentation tree, relative to the repo root. */
   docsDir: 'docs',
+
+  /** Per-rule severity overrides, merged over `RULES`. */
+  rules: {},
+
+  /**
+   * Command names an `evidence:` entry may start with. Anything else has to be
+   * a repository path that exists, so free prose stays rejected. A project that
+   * drives its checks through some other runner adds it with `evidenceRunners+`.
+   */
+  evidenceRunners: [
+    'bun', 'bunx', 'node', 'npm', 'npx', 'pnpm', 'yarn', 'deno', 'make', 'just',
+    'cargo', 'go', 'pytest', 'python', 'python3', 'grep', 'rg', 'ls', 'git', 'curl', 'psql',
+  ],
 
   /**
    * Ordered `[prefix, kind]` pairs, prefixes relative to `docsDir`. FIRST MATCH
@@ -71,8 +121,16 @@ export const DEFAULTS = {
    */
   tierStatus: { reference: 'reference', archive: 'superseded' },
 
-  /** Files exempt from frontmatter, relative to `docsDir`. */
-  exempt: ['INDEX.md', 'README.md'],
+  /**
+   * Files exempt from frontmatter, relative to `docsDir`. Every entry here is
+   * GENERATED: `gen` writes `INDEX.md`, and — once modules are configured —
+   * `ROADMAP.md` and a `README.md` per module tree. A generated artefact
+   * carrying frontmatter the generator did not write is a contradiction, so the
+   * gate must not demand it. `README.md` also covers the hand-written docs-root
+   * README, which is the tree's front door rather than a document in it.
+   * A single `*` stands for exactly one path segment (docs-taxonomy.mjs).
+   */
+  exempt: ['INDEX.md', 'README.md', 'ROADMAP.md', 'modules/*/README.md'],
 
   /**
    * NAMING. Path hygiene alone is a character rule — it rejects spaces and
@@ -121,6 +179,10 @@ export const DEFAULTS = {
    * not add a path here to silence a real dead pointer.
    */
   referenceScanExclude: [
+    // Installed dependencies are somebody else's repository. A vendored copy of
+    // THIS package names `docs/...` paths in its own templates and tests, and
+    // every one of them would be reported as a dead pointer in the host tree.
+    'node_modules',
     '.claude',
     '.agents',
     '_bmad',
@@ -137,19 +199,59 @@ export const DEFAULTS = {
 
 const cache = new Map()
 
+/**
+ * Resolve `"<key>+": [...]` into `"<key>"`, appending to the DEFAULT rather than
+ * replacing it. Replacing is the right default for a closed set a project owns,
+ * but the array settings that grow (`referenceScanExclude`, `sentinels`,
+ * `evidenceRunners`) are ones where a project wants ITS entries as well as the
+ * shipped ones, and a hand-copied default silently falls behind an upgrade.
+ *
+ * Runs before the merge, so `validate` only ever sees plain keys — and OUTSIDE
+ * the JSON parse, so a misuse of `+` is reported as the config error it is
+ * rather than dressed up as a syntax error in a perfectly valid file.
+ */
+function foldExtensions(overrides) {
+  const out = {}
+  for (const [key, value] of Object.entries(overrides)) {
+    // Editors resolve completion from `$schema`; it is metadata about the file,
+    // not a setting, so it is dropped here and never reaches the resolved config.
+    if (key === '$schema') continue
+    if (!key.endsWith('+')) {
+      // Setting both forms is a mistake with no sensible reading: whichever the
+      // author meant, key order in the file would decide, silently.
+      if (`${key}+` in overrides) {
+        throw new Error(`${CONFIG_FILE}: "${key}" and "${key}+" cannot both be set`)
+      }
+      out[key] = value
+      continue
+    }
+    const base = key.slice(0, -1)
+    if (base in overrides) throw new Error(`${CONFIG_FILE}: "${base}" and "${key}" cannot both be set`)
+    if (!Array.isArray(DEFAULTS[base])) {
+      throw new Error(`${CONFIG_FILE}: "${key}" extends "${base}", which is not an array setting`)
+    }
+    if (!Array.isArray(value)) throw new Error(`${CONFIG_FILE}: "${key}" must be an array`)
+    out[base] = [...DEFAULTS[base], ...value]
+  }
+  return out
+}
+
 /** Resolved configuration for one repository root. Cached per root. */
 export function loadConfig(root) {
   if (cache.has(root)) return cache.get(root)
   const file = join(root, CONFIG_FILE)
   let overrides = {}
   if (existsSync(file)) {
+    let parsed
     try {
-      overrides = JSON.parse(readFileSync(file, 'utf8'))
+      parsed = JSON.parse(readFileSync(file, 'utf8'))
     } catch (error) {
       throw new Error(`${CONFIG_FILE} is not valid JSON: ${error.message}`, { cause: error })
     }
+    overrides = foldExtensions(parsed)
   }
   const merged = { ...DEFAULTS, ...overrides }
+  merged.rules = { ...RULES, ...overrides.rules }
   validate(overrides, merged)
   const config = withDerived(merged)
   cache.set(root, config)
@@ -168,6 +270,8 @@ export function withDerived(config) {
     kinds: [...new Set(config.tiers.map(([, kind]) => kind))],
     moduleKeys: [...config.modules.map((entry) => entry.key), config.platformKey],
     exemptPaths: new Set(config.exempt.map((name) => `${config.docsDir}/${name}`)),
+    // Callers that build a config from DEFAULTS directly still get the full map.
+    rules: { ...RULES, ...config.rules },
   }
 }
 
@@ -186,6 +290,12 @@ function validate(overrides, merged) {
   for (const key of Object.keys(overrides)) {
     if (!(key in DEFAULTS)) {
       throw new Error(`${CONFIG_FILE}: unknown key "${key}" — known keys are ${Object.keys(DEFAULTS).join(', ')}`)
+    }
+  }
+  for (const [id, severity] of Object.entries(overrides.rules ?? {})) {
+    if (!(id in RULES)) throw new Error(`${CONFIG_FILE}: unknown rule "${id}" — known rules are ${Object.keys(RULES).join(', ')}`)
+    if (!SEVERITIES.includes(severity)) {
+      throw new Error(`${CONFIG_FILE}: rule "${id}" has severity "${severity}" — expected ${SEVERITIES.join(' | ')}`)
     }
   }
   for (const entry of merged.tiers) {

@@ -17,29 +17,11 @@
  */
 import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { parseFrontmatter } from './docs-frontmatter.mjs'
+import { parseFrontmatter, patchScalar } from './docs-frontmatter.mjs'
 import { loadConfig } from './docs-config.mjs'
 import { isExempt, kindForPath, moduleForPath } from './docs-taxonomy.mjs'
 import { listDocs, repoRoot } from './docs-fs.mjs'
 import { runDirect } from './docs-run.mjs'
-
-/**
- * Replace or insert one top-level scalar line inside a raw frontmatter block,
- * leaving every other byte alone. Re-rendering the whole block from parsed
- * data is not an option: the parser flattens values it cannot represent (a
- * nested map becomes a string), so a full re-render would corrupt them.
- * `^key:` matches top level only — nested keys are indented.
- */
-function patchScalar(raw, key, value, anchors) {
-  const line = `${key}: ${value}`
-  const existing = new RegExp(`^${key}:[^\\n]*$`, 'm')
-  if (existing.test(raw)) return raw.replace(existing, line)
-  for (const anchor of anchors) {
-    const anchorLine = raw.match(new RegExp(`^${anchor}:[^\\n]*$`, 'm'))
-    if (anchorLine) return raw.replace(anchorLine[0], `${anchorLine[0]}\n${line}`)
-  }
-  return `${line}\n${raw}`
-}
 
 /**
  * @returns {{path: string, from: string, to: string}[]} documents whose derived
@@ -63,7 +45,7 @@ export function fixFrontmatter(root, config = loadConfig(root), { dryRun = false
 
     changed.push({
       path,
-      from: `${data.kind ?? '-'}/${data.module ?? '-'}`,
+      from: `${data.kind || '-'}/${data.module || '-'}`,
       to: `${kind}/${moduleKey ?? '-'}`,
     })
     if (dryRun) continue

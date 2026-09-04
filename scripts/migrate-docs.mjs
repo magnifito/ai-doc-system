@@ -41,16 +41,12 @@ import { loadConfig } from './docs-config.mjs'
 import { kindForPath, moduleForPath, normalizeSegment, slugify, statusForKind } from './docs-taxonomy.mjs'
 import { lastCommitDate, listDocs, repoRoot } from './docs-fs.mjs'
 import { runDirect } from './docs-run.mjs'
+import { flagValues } from './docs-args.mjs'
 
 const DEFAULT_MAP = 'docs-migration.map.mjs'
 
-function flagValue(name) {
-  const index = process.argv.indexOf(name)
-  return index === -1 ? null : process.argv[index + 1]
-}
-
 async function loadMap(root) {
-  const given = flagValue('--map') ?? DEFAULT_MAP
+  const given = flagValues('migrate', process.argv, ['--map'])['--map'] ?? DEFAULT_MAP
   const file = isAbsolute(given) ? given : resolve(root, given)
   if (!existsSync(file)) {
     console.error(
@@ -80,10 +76,19 @@ function statusFor(config, map, destination) {
 /** Preserve an existing frontmatter block; append only the missing required fields. */
 function stampedContent(parsed, meta, body) {
   if (!parsed.present) return renderFrontmatter(meta) + body.replace(/^\n+/, '\n')
-  const missing = ['title', 'kind', 'module', 'status', 'updated']
-    .filter((key) => meta[key] && !parsed.data[key])
-    .map((key) => `${key}: ${meta[key]}`)
-  return `---\n${[parsed.raw, ...missing].join('\n')}\n---\n${body.replace(/^\n+/, '\n')}`
+  let raw = parsed.raw
+  const missing = []
+  for (const key of ['title', 'kind', 'module', 'status', 'updated']) {
+    if (!meta[key] || parsed.data[key]) continue
+    // A key written with no value is present in the block but useless. Fill it
+    // IN PLACE — appending a second `key:` line would leave the document with
+    // duplicate keys, which YAML rejects outright, so the migration would hand
+    // back a block less readable than the one it was given.
+    const blank = new RegExp(`^${key}:[ \\t]*$`, 'm')
+    if (blank.test(raw)) raw = raw.replace(blank, `${key}: ${meta[key]}`)
+    else missing.push(`${key}: ${meta[key]}`)
+  }
+  return `---\n${[raw, ...missing].join('\n')}\n---\n${body.replace(/^\n+/, '\n')}`
 }
 
 /**
@@ -171,13 +176,15 @@ export async function main() {
     const kind = kindForPath(config, destination)
     const moduleKey = config.modules.length > 0 ? moduleForPath(config, destination) : null
     const meta = {
-      title: parsed.data.title ?? firstHeading(parsed.body) ?? destination.split('/').pop().replace(/\.md$/, ''),
+      // `||`, not `??`: a key written with no value reads as '', and a blank
+      // title is exactly the case the fallback exists for.
+      title: parsed.data.title || firstHeading(parsed.body) || destination.split('/').pop().replace(/\.md$/, ''),
       // Derived from the DESTINATION: the gate requires both fields and asserts
       // they agree with the path, so the migration commit must pass on its own.
       ...(kind ? { kind } : {}),
       ...(moduleKey ? { module: moduleKey } : {}),
-      status: parsed.data.status ?? statusFor(config, map, destination),
-      updated: parsed.data.updated ?? lastCommitDate(root, path),
+      status: parsed.data.status || statusFor(config, map, destination),
+      updated: parsed.data.updated || lastCommitDate(root, path),
       ...(parsed.data.implements ? { implements: parsed.data.implements } : {}),
       ...(parsed.data.code ? { code: parsed.data.code } : {}),
       ...(parsed.data.superseded_by ? { superseded_by: parsed.data.superseded_by } : {}),

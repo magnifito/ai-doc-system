@@ -16,9 +16,10 @@ import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'nod
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import test from 'node:test'
-import { checkDocs } from './check-docs.mjs'
+import { checkDocs, escapeData, escapeProperty } from './check-docs.mjs'
 import { buildIndex, renderMarkdown, renderIndex } from './gen-docs-index.mjs'
-import { DEFAULTS, clearConfigCache, loadConfig, withDerived } from './docs-config.mjs'
+import { DEFAULTS, RULES, clearConfigCache, loadConfig, withDerived } from './docs-config.mjs'
+import { LIST_FIELDS } from './docs-frontmatter.mjs'
 
 
 /**
@@ -47,7 +48,12 @@ function fixture(files, { withIndex = true, config } = {}) {
 function run(files, options) {
   const root = fixture(files, options)
   try {
-    return checkDocs(root)
+    return checkDocs(
+      root,
+      options?.config
+        ? withDerived({ ...DEFAULTS, ...options.config, rules: { ...RULES, ...options.config.rules } })
+        : undefined,
+    )
   } finally {
     rmSync(root, { recursive: true, force: true })
   }
@@ -276,7 +282,9 @@ const MODULE_CONFIG = {
   tierStatus: { reference: 'reference', archive: 'superseded' },
   tierOrder: ['state', 'todo', 'reference', 'archive'],
   indexSubdivide: [],
-  exempt: ['INDEX.md', 'README.md', 'ROADMAP.md', 'modules/*/README.md'],
+  // No `exempt` override: `ROADMAP.md` and `modules/*/README.md` are generated
+  // by `gen` as soon as modules are configured, so the DEFAULTS have to cover
+  // them. A hand-copied list here would hide the gap from every other project.
   modules: [
     { key: 'core', class: 'core', requires: [] },
     { key: 'crm', class: 'anchor', requires: [] },
@@ -529,4 +537,250 @@ test('8j. evidence may name a path with Next.js dynamic segments', () => {
     'docs/modules/crm/state/[id]/(group)/pipelines.md': STATE_DOC,
   })
   assert.deepEqual(violations.filter((v) => v.field === 'evidence'), [])
+})
+
+
+test('11a. every violation carries a rule id and a severity', () => {
+  const violations = run({ 'docs/engineering/x.md': '# No frontmatter\n' })
+  assert.ok(violations.length > 0)
+  for (const v of violations) {
+    assert.equal(typeof v.rule, 'string')
+    assert.ok(['error', 'warn'].includes(v.severity), `${v.rule} has severity ${v.severity}`)
+  }
+  assert.ok(violations.some((v) => v.rule === 'frontmatter' && v.severity === 'error'))
+})
+
+test('11b. a rule set to off produces no violation; warn keeps it but demotes it', () => {
+  const files = {
+    'docs/engineering/a.md': GOOD,
+    'docs/engineering/b.md': doc({ title: 'B', kind: 'engineering', status: 'active', updated: '2026-08-17', implements: 'docs/nowhere.md' }),
+  }
+  const off = run(files, { config: { rules: { implements: 'off' } } })
+  assert.ok(!off.some((v) => v.rule === 'implements'))
+  const warn = run(files, { config: { rules: { implements: 'warn' } } })
+  assert.ok(warn.some((v) => v.rule === 'implements' && v.severity === 'warn'))
+})
+
+test('2g. an impossible calendar date is rejected', () => {
+  const violations = run({ 'docs/engineering/x.md': doc({ title: 'X', kind: 'engineering', status: 'active', updated: '2026-13-45' }) })
+  assert.ok(violations.some((v) => v.rule === 'date' && v.field === 'updated'))
+})
+
+test('2h. implements, superseded_by and evidence resolve case-exactly', () => {
+  const violations = run({
+    'docs/product/target.md': doc({ title: 'T', kind: 'product', status: 'active', updated: '2026-08-17' }),
+    'docs/product/a.md': doc({ title: 'A', kind: 'product', status: 'active', updated: '2026-08-17', implements: 'docs/product/TARGET.md' }),
+    'docs/archive/b.md': doc({ title: 'B', kind: 'archive', status: 'superseded', updated: '2026-08-17', superseded_by: 'docs/product/Target.md' }),
+    'docs/product/c.md': doc({ title: 'C', kind: 'product', status: 'active', updated: '2026-08-17', evidence: ['docs/product/TARGET.md'] }),
+    'docs/product/d.md': doc({ title: 'D', kind: 'product', status: 'active', updated: '2026-08-17', evidence: ['docs/product/'] }),
+  })
+  assert.ok(violations.some((v) => v.field === 'implements'))
+  assert.ok(violations.some((v) => v.field === 'superseded_by'))
+  assert.ok(violations.some((v) => v.file === 'docs/product/c.md' && v.field === 'evidence'))
+  // A directory entry is legitimate evidence: the trailing slash is stripped, not rejected.
+  assert.deepEqual(violations.filter((v) => v.file === 'docs/product/d.md' && v.field === 'evidence'), [])
+})
+
+test('8l. evidence may start with a configured runner', () => {
+  // `bazel` is deliberately NOT in the shipped runner list: the first half has
+  // to fail on the defaults for the second half to prove anything.
+  const state = doc({ title: 'S', kind: 'state', status: 'active', updated: '2026-08-17', module: 'crm', verified_on: '2026-08-17', evidence: ['bazel test //crm:all'] })
+  const files = { 'docs/modules/crm/state/s.md': state }
+  const base = { modules: [{ key: 'crm', class: 'anchor' }], tiers: [['modules/*/state/', 'state'], ...DEFAULTS.tiers], requiredFields: { state: ['verified_on', 'evidence'] } }
+  assert.ok(run(files, { config: base }).some((v) => v.rule === 'evidence'))
+  assert.ok(!run(files, { config: { ...base, evidenceRunners: [...DEFAULTS.evidenceRunners, 'bazel'] } }).some((v) => v.rule === 'evidence'))
+})
+
+test('12a. shipped without code is a warning, not an error', () => {
+  const violations = run({ 'docs/plans/done/x.md': doc({ title: 'X', kind: 'plan', status: 'shipped', updated: '2026-08-17' }) })
+  const hit = violations.find((v) => v.rule === 'shipped-code')
+  assert.ok(hit)
+  assert.equal(hit.severity, 'warn')
+})
+
+test('13a. summary must be one non-empty line when present', () => {
+  const bad = run({ 'docs/engineering/x.md': doc({ title: 'X', kind: 'engineering', status: 'active', updated: '2026-08-17', summary: '""' }) })
+  assert.ok(bad.some((v) => v.rule === 'summary'))
+  const multi = run({ 'docs/engineering/x.md': '---\ntitle: X\nkind: engineering\nstatus: active\nupdated: 2026-08-17\nsummary: |\n  one\n  two\n---\n# X\n' })
+  assert.ok(multi.some((v) => v.rule === 'summary' && /one line/.test(v.message)))
+  const good = run({ 'docs/engineering/x.md': doc({ title: 'X', kind: 'engineering', status: 'active', updated: '2026-08-17', summary: 'What the gate asserts.' }) })
+  assert.ok(!good.some((v) => v.rule === 'summary'))
+})
+
+test('13b. source_url must be http(s) when present', () => {
+  const ref = (url) => doc({ title: 'R', kind: 'reference', status: 'reference', updated: '2026-08-17', source_url: url })
+  assert.ok(run({ 'docs/reference/r.md': ref('ftp://x') }).some((v) => v.rule === 'source-url'))
+  assert.ok(!run({ 'docs/reference/r.md': ref('https://example.test/doc') }).some((v) => v.rule === 'source-url'))
+})
+
+test('13c. the index carries summary, source_url and review_by', () => {
+  const root = fixture({
+    'docs/reference/r.md': doc({ title: 'R', kind: 'reference', status: 'reference', updated: '2026-08-17', summary: 'Captured.', source_url: 'https://example.test/doc', review_by: '2027-01-01' }),
+  })
+  try {
+    const [entry] = buildIndex(root)
+    assert.equal(entry.summary, 'Captured.')
+    assert.equal(entry.source_url, 'https://example.test/doc')
+    assert.equal(entry.review_by, '2027-01-01')
+    assert.match(renderMarkdown([entry]), /\| Summary \|/)
+    assert.match(renderMarkdown([entry]), /Captured\./)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('13d. review_by must be an ISO date when present', () => {
+  const violations = run({ 'docs/engineering/x.md': doc({ title: 'X', kind: 'engineering', status: 'active', updated: '2026-08-17', review_by: 'someday' }) })
+  assert.ok(violations.some((v) => v.rule === 'date' && v.field === 'review_by' && /ISO date/.test(v.message)))
+})
+
+test('13e. a summary containing a pipe is escaped in the INDEX.md table', () => {
+  const entry = { path: 'docs/engineering/x.md', title: 'X', kind: 'engineering', status: 'active', updated: '2026-08-17', summary: 'a | b' }
+  assert.match(renderMarkdown([entry]), /a \\\| b/)
+})
+
+test('13f. a summary that is not one string is a violation, not a crash', () => {
+  const list = run({ 'docs/engineering/x.md': '---\ntitle: X\nkind: engineering\nstatus: active\nupdated: 2026-08-17\nsummary:\n  - one\n  - two\n---\n# X\n' })
+  assert.ok(list.some((v) => v.rule === 'vocabulary' && v.field === 'summary' && /not a list or a map/.test(v.message)))
+  const map = run({ 'docs/engineering/x.md': '---\ntitle: X\nkind: engineering\nstatus: active\nupdated: 2026-08-17\nsummary:\n  a: b\n---\n# X\n' })
+  assert.ok(map.some((v) => v.rule === 'vocabulary' && v.field === 'summary' && /not a list or a map/.test(v.message)))
+})
+
+test('13g. a non-scalar value in a scalar field is a violation, never a crash', () => {
+  // Every one of these crashed a renderer or a check before the shape pass:
+  // `.replace` on a title, `.split` on implements, `join()` on superseded_by.
+  const cases = [
+    ['title', '---\ntitle:\n  a: b\nkind: engineering\nstatus: active\nupdated: 2026-08-17\n---\n# X\n', 'docs/engineering/x.md'],
+    ['implements', '---\ntitle: X\nkind: engineering\nstatus: active\nupdated: 2026-08-17\nimplements:\n  a: b\n---\n# X\n', 'docs/engineering/x.md'],
+    ['superseded_by', '---\ntitle: Old\nkind: archive\nstatus: superseded\nupdated: 2026-08-09\nsuperseded_by:\n  a: b\n---\n# Old\n', 'docs/archive/old.md'],
+    ['code', '---\ntitle: X\nkind: engineering\nstatus: active\nupdated: 2026-08-17\ncode:\n  - one\n  - two\n---\n# X\n', 'docs/engineering/x.md'],
+  ]
+  for (const [field, source, path] of cases) {
+    const violations = run({ [path]: source })
+    assert.ok(
+      violations.some((v) => v.rule === 'vocabulary' && v.field === field && /not a list or a map/.test(v.message)),
+      `expected a vocabulary violation on ${field}`,
+    )
+  }
+  // A deleted title is then genuinely absent, so the required check fires too.
+  const titled = run({ 'docs/engineering/x.md': cases[0][1] })
+  assert.ok(titled.some((v) => v.rule === 'required' && v.field === 'title'))
+})
+
+test('13h. a list field that is not a list is a violation', () => {
+  const violations = run(
+    { 'docs/modules/crm/state/s.md': '---\ntitle: S\nkind: state\nmodule: crm\nstatus: active\nupdated: 2026-08-17\nverified_on: 2026-08-17\nevidence:\n  a: b\n---\n# S\n' },
+    { config: { modules: [{ key: 'crm', class: 'anchor' }], tiers: [['modules/*/state/', 'state'], ...DEFAULTS.tiers], requiredFields: { state: ['verified_on', 'evidence'] } } },
+  )
+  assert.ok(violations.some((v) => v.rule === 'evidence' && v.field === 'evidence' && /must be a list/.test(v.message)))
+})
+
+test('14a. index.json carries a by_code reverse map over code: and evidence paths', () => {
+  const root = fixture({
+    'src/a.ts': 'x',
+    'src/b/index.ts': 'x',
+    'docs/product/a.md': doc({ title: 'A', kind: 'product', status: 'shipped', updated: '2026-08-17', code: 'src/a.ts' }),
+    'docs/product/b.md': doc({ title: 'B', kind: 'product', status: 'shipped', updated: '2026-08-17', code: 'src/b/' }),
+    // One document claiming both paths through evidence rather than `code:`,
+    // in all three forms: a `:line` suffix, a command, a trailing slash.
+    'docs/product/e.md': doc({
+      title: 'E', kind: 'product', status: 'shipped', updated: '2026-08-17',
+      evidence: ['src/a.ts:12', 'npm test', 'src/b/'],
+    }),
+  })
+  try {
+    const json = JSON.parse(readFileSync(join(root, 'docs/index.json'), 'utf8'))
+    assert.deepEqual(json.by_code, {
+      'src/a.ts': ['docs/product/a.md', 'docs/product/e.md'],
+      'src/b': ['docs/product/b.md', 'docs/product/e.md'],
+    })
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('14b. an evidence list of maps yields no by_code key, and no crash', () => {
+  const root = fixture({
+    'docs/product/m.md': '---\ntitle: M\nkind: product\nstatus: shipped\nupdated: 2026-08-17\nevidence:\n  - a: b\n---\n# M\n',
+  })
+  try {
+    const json = JSON.parse(readFileSync(join(root, 'docs/index.json'), 'utf8'))
+    assert.deepEqual(json.by_code, {})
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('15a. a document whose implements target was updated after it is a warning', () => {
+  const violations = run({
+    'docs/product/roadmap.md': doc({ title: 'R', kind: 'product', status: 'active', updated: '2026-09-01' }),
+    'docs/plans/p.md': doc({ title: 'P', kind: 'plan', status: 'active', updated: '2026-08-01', implements: 'docs/product/roadmap.md' }),
+  })
+  const hit = violations.find((v) => v.rule === 'upstream')
+  assert.ok(hit)
+  assert.equal(hit.severity, 'warn')
+  assert.equal(hit.file, 'docs/plans/p.md')
+})
+
+test('15b. review_by in the past is a warning; in the future it is silent', () => {
+  const files = { 'docs/engineering/x.md': doc({ title: 'X', kind: 'engineering', status: 'active', updated: '2026-08-01', review_by: '2026-09-01' }) }
+  const root = fixture(files)
+  try {
+    assert.ok(checkDocs(root, undefined, { now: new Date('2026-09-03T00:00:00Z') }).some((v) => v.rule === 'review'))
+    assert.ok(!checkDocs(root, undefined, { now: new Date('2026-08-15T00:00:00Z') }).some((v) => v.rule === 'review'))
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('15c. with no options, `now` defaults to the real clock', () => {
+  const root = fixture({
+    'docs/engineering/x.md': doc({ title: 'X', kind: 'engineering', status: 'active', updated: '2026-08-01', review_by: '2999-01-01' }),
+    // Both directions against the real clock: a date absence alone would pass
+    // just as well if the rule had stopped firing altogether.
+    'docs/engineering/y.md': doc({ title: 'Y', kind: 'engineering', status: 'active', updated: '2000-01-01', review_by: '2000-01-02' }),
+  })
+  try {
+    const violations = checkDocs(root)
+    assert.deepEqual(violations.filter((v) => v.rule === 'review').map((v) => v.file), ['docs/engineering/y.md'])
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('a tree with modules configured is clean straight after `gen` — its generated artefacts are exempt', () => {
+  const violations = runModular({
+    'docs/modules/crm/state/pipelines.md': STATE_DOC,
+  })
+  assert.deepEqual(violations, [])
+})
+
+// ── the report surface: workflow-command escaping and the rule vocabulary ────
+
+test('github annotations encode % first, then the data and property characters', () => {
+  // `%` first, or the encoder would re-encode the escapes it just wrote.
+  assert.equal(escapeData('%0A'), '%250A')
+  assert.equal(escapeData('100% of the time'), '100%25 of the time')
+  assert.equal(escapeData('a\r\nb'), 'a%0D%0Ab')
+  // A property list is delimited by `,` and `:`, so a value carrying either one
+  // would forge a property — `file=a,title=b` out of a single file name.
+  assert.equal(escapeProperty('docs/engineering/a,b:c.md'), 'docs/engineering/a%2Cb%3Ac.md')
+  assert.equal(escapeProperty('%,:'), '%25%2C%3A')
+  // The data half deliberately leaves them alone: the message is the last field
+  // on the line and has no list to break out of.
+  assert.equal(escapeData('a,b:c'), 'a,b:c')
+})
+
+test('every rule id the gate can emit is a key of RULES', () => {
+  const source = readFileSync(new URL('./check-docs.mjs', import.meta.url), 'utf8')
+  // The lookbehind keeps `refs.add(...)` — a Set, not the violation collector —
+  // out of the scan.
+  const ids = new Set([...source.matchAll(/(?<![.\w])add\('([a-z-]+)'/g)].map((match) => match[1]))
+  // One `add` call passes the FIELD name as the rule id — the list-shape check,
+  // which is why `evidence` and `changes` are rule ids as well as fields.
+  for (const field of LIST_FIELDS) ids.add(field)
+  const dynamic = [...source.matchAll(/(?<![.\w])add\((?!')/g)]
+  assert.equal(dynamic.length, 1, 'a new dynamic add() call must have its rule ids listed here')
+  assert.ok(ids.size >= 15, `only found ${ids.size} rule ids — the scan has stopped matching`)
+  for (const id of ids) assert.ok(id in RULES, `check-docs emits "${id}", which RULES does not define`)
 })

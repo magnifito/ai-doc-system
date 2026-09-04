@@ -12,11 +12,21 @@
  */
 import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { parseFrontmatter } from './docs-frontmatter.mjs'
+import { EVIDENCE_PATH, parseFrontmatter } from './docs-frontmatter.mjs'
 import { DEFAULTS, loadConfig, withDerived } from './docs-config.mjs'
 import { isExempt, kindForPath, moduleForPath } from './docs-taxonomy.mjs'
 import { listDocs, repoRoot } from './docs-fs.mjs'
 import { runDirect } from './docs-run.mjs'
+
+/**
+ * A scalar field's value, or undefined when it is not one. The gate reports a
+ * list- or map-valued scalar as a violation; the index simply must not carry it,
+ * because the renderers below call `.replace` on what they are given and the
+ * gate itself regenerates the index in memory before it can report anything.
+ */
+function str(data, key) {
+  return typeof data[key] === 'string' ? data[key] : undefined
+}
 
 export function buildIndex(root, config = loadConfig(root)) {
   const entries = []
@@ -25,19 +35,27 @@ export function buildIndex(root, config = loadConfig(root)) {
     const { data } = parseFrontmatter(readFileSync(join(root, path), 'utf8'))
     entries.push({
       path,
-      title: data.title ?? '',
+      title: str(data, 'title') ?? '',
+      ...(str(data, 'summary') ? { summary: data.summary } : {}),
       kind: kindForPath(config, path) ?? '',
       // Omitted rather than empty when the project declares no modules, so a
       // tree that does not use the axis keeps a byte-identical index.
       ...(moduleForPath(config, path) ? { module: moduleForPath(config, path) } : {}),
-      status: data.status ?? '',
-      updated: data.updated ?? '',
-      ...(data.verified_on ? { verified_on: data.verified_on } : {}),
-      ...(data.commitment ? { commitment: data.commitment } : {}),
+      status: str(data, 'status') ?? '',
+      updated: str(data, 'updated') ?? '',
+      ...(str(data, 'review_by') ? { review_by: data.review_by } : {}),
+      ...(str(data, 'verified_on') ? { verified_on: data.verified_on } : {}),
+      // Carried so the reverse index can point back from a path an evidence
+      // entry names. Only ever a list here; a malformed value is the gate's
+      // business, and the index must not carry a shape the renderers cannot.
+      // `parseFrontmatter` has already coerced every member to a string.
+      ...(Array.isArray(data.evidence) && data.evidence.length > 0 ? { evidence: data.evidence } : {}),
+      ...(str(data, 'commitment') ? { commitment: data.commitment } : {}),
       ...(Array.isArray(data.changes) && data.changes.length > 0 ? { changes: data.changes } : {}),
-      ...(data.implements ? { implements: data.implements } : {}),
-      ...(data.code ? { code: data.code } : {}),
-      ...(data.superseded_by ? { superseded_by: data.superseded_by } : {}),
+      ...(str(data, 'implements') ? { implements: data.implements } : {}),
+      ...(str(data, 'code') ? { code: data.code } : {}),
+      ...(str(data, 'source_url') ? { source_url: data.source_url } : {}),
+      ...(str(data, 'superseded_by') ? { superseded_by: data.superseded_by } : {}),
     })
   }
   // listDocs is already sorted; keep plain codepoint order (NOT localeCompare,
@@ -45,8 +63,54 @@ export function buildIndex(root, config = loadConfig(root)) {
   return entries
 }
 
-export function renderJson(entries) {
-  return `${JSON.stringify({ generated: 'scripts/gen-docs-index.mjs', count: entries.length, docs: entries }, null, 2)}\n`
+/**
+ * Normalise a `code:` value or a path-form evidence entry to a repository path:
+ * no `#fragment`, no `:line` or `:line-line` suffix, no trailing slash — so a
+ * document claiming `src/api/` and one claiming `src/api` land on one key.
+ */
+function codeKey(value) {
+  return value.split('#')[0].replace(/:\d+(?:-\d+)?$/, '').replace(/\/$/, '')
+}
+
+/**
+ * The reverse of `code:`: a code path -> the documents that claim it. Keys are
+ * sorted by codepoint and each list is sorted, because this ships inside
+ * `index.json`, which has to regenerate byte-identically.
+ */
+export function buildByCode(entries, config = withDerived(DEFAULTS)) {
+  const map = new Map()
+  const put = (key, path) => {
+    if (!map.has(key)) map.set(key, new Set())
+    map.get(key).add(path)
+  }
+  for (const entry of entries) {
+    if (entry.code) put(codeKey(entry.code), entry.path)
+    for (const item of entry.evidence ?? []) {
+      const value = item.trim()
+      // Command-form evidence (`npm test`) names no path to point back from.
+      if (config.evidenceRunners.includes(value.split(/\s+/)[0])) continue
+      // Neither a command nor a path is a violation the GATE reports. It must
+      // not become a key here: `parseFrontmatter` coerces every list member to
+      // a string, so an `evidence:` list of maps would otherwise index the
+      // document under the literal "[object Object]".
+      const match = value.match(EVIDENCE_PATH)
+      if (!match) continue
+      put(codeKey(match[1]), entry.path)
+    }
+  }
+  return Object.fromEntries(
+    [...map].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)).map(([key, docs]) => [key, [...docs].sort()]),
+  )
+}
+
+export function renderJson(entries, config) {
+  const payload = {
+    generated: 'scripts/gen-docs-index.mjs',
+    count: entries.length,
+    docs: entries,
+    by_code: buildByCode(entries, config),
+  }
+  return `${JSON.stringify(payload, null, 2)}\n`
 }
 
 /**
@@ -88,11 +152,12 @@ export function renderMarkdown(entries, config) {
     out.push(`## ${kind} (${group.length})`, '')
     for (const [area, rows] of groupByArea(resolved, group, kind)) {
       if (area) out.push(`### ${area} (${rows.length})`, '')
-      out.push('| Document | Status | Updated |', '|---|---|---|')
+      out.push('| Document | Status | Updated | Summary |', '|---|---|---|---|')
       for (const entry of rows) {
         const label = (entry.title || entry.path).replace(/\|/g, '\\|')
         const href = entry.path.slice(resolved.docsDir.length + 1)
-        out.push(`| [${label}](${href}) | \`${entry.status}\` | ${entry.updated} |`)
+        const summary = (entry.summary ?? '').replace(/\|/g, '\\|')
+        out.push(`| [${label}](${href}) | \`${entry.status}\` | ${entry.updated} | ${summary} |`)
       }
       out.push('')
     }
@@ -197,7 +262,7 @@ export function renderRoadmap(config, entries) {
 export function renderIndex(root, config = loadConfig(root)) {
   const entries = buildIndex(root, config)
   const targets = [
-    [`${config.docsDir}/index.json`, renderJson(entries)],
+    [`${config.docsDir}/index.json`, renderJson(entries, config)],
     [`${config.docsDir}/INDEX.md`, renderMarkdown(entries, config)],
   ]
   for (const moduleDef of config.modules) {
@@ -212,30 +277,43 @@ export function renderIndex(root, config = loadConfig(root)) {
   return targets
 }
 
+/**
+ * Write every generated artefact. Exported so the writers (`new`, `mv`) can
+ * leave the tree gate-clean in one call rather than shelling out to this
+ * script. Returns the paths written.
+ */
+export function writeIndex(root, config = loadConfig(root)) {
+  const written = []
+  for (const [path, content] of renderIndex(root, config)) {
+    writeFileSync(join(root, path), content)
+    written.push(path)
+  }
+  return written
+}
+
 export function main() {
   const root = repoRoot()
   const config = loadConfig(root)
-  const targets = renderIndex(root, config)
   const check = process.argv.includes('--check')
 
+  if (!check) {
+    for (const path of writeIndex(root, config)) console.log(`wrote ${path}`)
+    process.exit(0)
+  }
+
   let stale = false
-  for (const [path, content] of targets) {
-    if (check) {
-      let current = null
-      try {
-        current = readFileSync(join(root, path), 'utf8')
-      } catch {
-        /* missing counts as stale */
-      }
-      // CRLF-tolerant for the same reason as the gate's assertion 4: a Windows
-      // checkout is not a stale index.
-      if (current?.replaceAll('\r\n', '\n') !== content) {
-        console.error(`stale: ${path} — run \`node scripts/gen-docs-index.mjs\``)
-        stale = true
-      }
-    } else {
-      writeFileSync(join(root, path), content)
-      console.log(`wrote ${path}`)
+  for (const [path, content] of renderIndex(root, config)) {
+    let current = null
+    try {
+      current = readFileSync(join(root, path), 'utf8')
+    } catch {
+      /* missing counts as stale */
+    }
+    // CRLF-tolerant for the same reason as the gate's assertion 4: a Windows
+    // checkout is not a stale index.
+    if (current?.replaceAll('\r\n', '\n') !== content) {
+      console.error(`stale: ${path} — run \`node scripts/gen-docs-index.mjs\``)
+      stale = true
     }
   }
   process.exit(stale ? 1 : 0)

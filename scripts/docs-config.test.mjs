@@ -6,11 +6,11 @@
  * Run: node --test scripts/docs-config.test.mjs
  */
 import { strict as assert } from 'node:assert'
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import test from 'node:test'
-import { CONFIG_FILE, DEFAULTS, loadConfig, withDerived } from './docs-config.mjs'
+import { CONFIG_FILE, DEFAULTS, clearConfigCache, loadConfig, withDerived } from './docs-config.mjs'
 import { kindForPath, isExempt } from './docs-taxonomy.mjs'
 import { checkDocs } from './check-docs.mjs'
 import { buildIndex, renderIndex } from './gen-docs-index.mjs'
@@ -33,6 +33,11 @@ function withFixture(files, config, body) {
   try {
     return body(root)
   } finally {
+    // The cache is keyed by root, and several bodies below write a config file
+    // and call `loadConfig` — leaving a resolved config behind for a directory
+    // that no longer exists. Cheap to clear, and it keeps one test from
+    // deciding what the next one reads.
+    clearConfigCache()
     rmSync(root, { recursive: true, force: true })
   }
 }
@@ -193,4 +198,102 @@ test('a module requiring a key that is not registered is rejected', () => {
 test('requiredFields naming a kind that no tier produces is rejected', () => {
   const root = fixture({}, { requiredFields: { nonesuch: ['x'] } })
   assert.throws(() => loadConfig(root), /requiredFields names kind "nonesuch"/)
+})
+
+
+test('rules: defaults carry every known id at its default severity', () => {
+  const config = withDerived(DEFAULTS)
+  assert.equal(config.rules.link, 'error')
+  assert.equal(config.rules['shipped-code'], 'warn')
+  assert.equal(config.rules['evidence-lock'], 'warn')
+  // The advisory-only ids: never evaluated by the gate, tunable all the same.
+  assert.equal(config.rules['updated-drift'], 'warn')
+  assert.equal(config.rules['code-pointer'], 'warn')
+  assert.equal(config.rules['verification-drift'], 'warn')
+})
+
+test('rules: an override changes one severity and keeps the rest', () => {
+  const root = mkdtempSync(join(tmpdir(), 'docs-config-'))
+  try {
+    writeFileSync(join(root, 'docs-system.config.json'), JSON.stringify({ rules: { basename: 'warn' } }))
+    clearConfigCache()
+    const config = loadConfig(root)
+    assert.equal(config.rules.basename, 'warn')
+    assert.equal(config.rules.link, 'error')
+  } finally {
+    clearConfigCache()
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('rules: an unknown id or severity is rejected', () => {
+  const root = mkdtempSync(join(tmpdir(), 'docs-config-'))
+  try {
+    writeFileSync(join(root, 'docs-system.config.json'), JSON.stringify({ rules: { bogus: 'error' } }))
+    clearConfigCache()
+    assert.throws(() => loadConfig(root), /unknown rule "bogus"/)
+    writeFileSync(join(root, 'docs-system.config.json'), JSON.stringify({ rules: { link: 'loud' } }))
+    clearConfigCache()
+    assert.throws(() => loadConfig(root), /severity "loud"/)
+  } finally {
+    clearConfigCache()
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+
+test('a "+" key extends the default array instead of replacing it', () => {
+  withFixture({}, { 'referenceScanExclude+': ['site'], 'sentinels+': ['SPEC'] }, (root) => {
+    clearConfigCache()
+    const config = loadConfig(root)
+    assert.ok(config.referenceScanExclude.includes('.claude'))
+    assert.ok(config.referenceScanExclude.includes('site'))
+    assert.ok(config.sentinels.includes('README') && config.sentinels.includes('SPEC'))
+    assert.equal('referenceScanExclude+' in config, false)
+  })
+})
+
+test('a "+" key on a non-array default is rejected', () => {
+  withFixture({}, { 'docsDir+': ['x'] }, (root) => {
+    clearConfigCache()
+    // Both halves matter: the message names the offending key AND says why, so
+    // the unknown-key path cannot satisfy this test by accident.
+    assert.throws(() => loadConfig(root), /"docsDir\+"/)
+    assert.throws(() => loadConfig(root), /not an array setting/)
+    // A config error is not a parse error: the JSON here is perfectly valid.
+    assert.throws(() => loadConfig(root), (error) => !/not valid JSON/.test(error.message))
+  })
+})
+
+test('evidenceRunners has defaults and can be extended', () => {
+  withFixture({}, { 'evidenceRunners+': ['just'] }, (root) => {
+    clearConfigCache()
+    const config = loadConfig(root)
+    assert.ok(config.evidenceRunners.includes('pnpm') && config.evidenceRunners.includes('just'))
+  })
+})
+
+test('a "$schema" key is allowed and ignored', () => {
+  withFixture({}, { $schema: './schema/docs-system.config.schema.json' }, (root) => {
+    clearConfigCache()
+    const config = loadConfig(root)
+    assert.equal(config.docsDir, DEFAULTS.docsDir)
+    // Editor metadata, not a setting: it must not reach the resolved config.
+    assert.equal('$schema' in config, false)
+  })
+})
+
+test('a key and its "+" form together is rejected', () => {
+  withFixture({}, { sentinels: ['README'], 'sentinels+': ['SPEC'] }, (root) => {
+    clearConfigCache()
+    assert.throws(() => loadConfig(root), /"sentinels" and "sentinels\+" cannot both be set/)
+  })
+})
+
+test('the JSON schema names every DEFAULTS key and its "+" form for arrays', () => {
+  const schema = JSON.parse(readFileSync(new URL('../schema/docs-system.config.schema.json', import.meta.url), 'utf8'))
+  for (const [key, value] of Object.entries(DEFAULTS)) {
+    assert.ok(key in schema.properties, `schema lacks ${key}`)
+    if (Array.isArray(value)) assert.ok(`${key}+` in schema.properties, `schema lacks ${key}+`)
+  }
 })
