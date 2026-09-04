@@ -9,8 +9,13 @@ import { RULES } from './docs-config.mjs'
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)))
 const SKILLS = join(ROOT, 'skills')
 const EXPECTED = ['docs-adopt', 'docs-sort', 'docs-promote', 'docs-audit', 'docs-gate']
-// Claude Code truncates or rejects longer descriptions; the trigger must fit.
-const DESCRIPTION_MAX = 1024
+// Claude Code lists a plugin skill WITHOUT its description once the description passes roughly
+// 500 characters — observed 2026-09-04: four skills at 524–588 characters were listed blank, the
+// one at 441 was listed in full. A skill with no description is one the agent cannot choose, so
+// the trigger has to fit well under that line. The description also says only WHEN to use the
+// skill, never what it does: an agent that reads a workflow summary follows the summary and skips
+// the body.
+const DESCRIPTION_MAX = 400
 // The subcommands cli/cli.mjs dispatches. Kept by hand — importing that module would run the
 // dispatcher — so a command added or renamed there must be mirrored here in the same change. A
 // skill naming a command the CLI does not have sends the agent straight to a usage error.
