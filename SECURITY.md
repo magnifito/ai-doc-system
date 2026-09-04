@@ -2,12 +2,12 @@
 
 ## Supported versions
 
-Only the latest published version of `@puralex/ai-doc-system` receives security fixes.
+Only the latest published version of `@puralex/docs-notary` receives security fixes.
 
 ## Reporting a vulnerability
 
 Report vulnerabilities privately via
-[GitHub security advisories](https://github.com/magnifito/ai-doc-system/security/advisories/new).
+[GitHub security advisories](https://github.com/magnifito/docs-notary/security/advisories/new).
 Do not open a public issue for a security problem.
 
 You can expect an acknowledgement within a week. Fixes ship as a patch release with a changelog

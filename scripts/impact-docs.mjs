@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * `ai-doc-system impact [--base <ref>] [--json]` — which documents make claims
+ * `docs-notary impact [--base <ref>] [--json]` — which documents make claims
  * about the paths that changed. `code:` points from a document at code; nothing
  * pointed back until now. Advisory: exit 0 always; appended to
  * GITHUB_STEP_SUMMARY when set, so a pull request shows the documents it may

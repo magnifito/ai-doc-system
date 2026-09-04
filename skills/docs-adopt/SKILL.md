@@ -1,6 +1,6 @@
 ---
 name: docs-adopt
-description: Use when a repository has no docs/index.json and its docs tree is unnavigable, misleading, or unenforced — an agent cannot tell whether a document describes something the product has, has committed to, or will never build. Surveys the tree, asks the four questions, installs @puralex/ai-doc-system, writes the migration map, tiers every document by authority, stamps validated frontmatter, generates the agent-readable index, and wires the blocking gate into CI. Not for a tree that already has docs/index.json — use docs-sort, docs-promote, docs-audit or docs-gate there.
+description: Use when a repository has no docs/index.json and its docs tree is unnavigable, misleading, or unenforced — an agent cannot tell whether a document describes something the product has, has committed to, or will never build. Surveys the tree, asks the four questions, installs @puralex/docs-notary, writes the migration map, tiers every document by authority, stamps validated frontmatter, generates the agent-readable index, and wires the blocking gate into CI. Not for a tree that already has docs/index.json — use docs-sort, docs-promote, docs-audit or docs-gate there.
 ---
 
 # Adopt the documentation system
@@ -44,7 +44,7 @@ Ask the user four questions and treat the answers as constraints, not suggestion
 
 Two routes; prefer the first:
 
-**npm.** `npm install -D @puralex/ai-doc-system` in the target, then `npx ai-doc-system init` for a
+**npm.** `npm install -D @puralex/docs-notary` in the target, then `npx docs-notary init` for a
 greenfield tree (contract, index, scripts — gate-clean immediately), or wire the commands by hand
 for a migration.
 
@@ -58,7 +58,7 @@ If the target's answers differ from the defaults, write `docs-system.config.json
 `requiredFields` (extra fields a kind demands), `vocabularies`, the module axis (`modules`,
 `moduleRoot`, `platformKey` — leave `modules` empty and every module assertion passes vacuously),
 and `rules` (per-rule severity: `error`, `warn` or `off`). Point `$schema` at
-`https://raw.githubusercontent.com/magnifito/ai-doc-system/main/schema/docs-system.config.schema.json`
+`https://raw.githubusercontent.com/magnifito/docs-notary/main/schema/docs-system.config.schema.json`
 for completion, and use a `key+` suffix to extend an array default instead of replacing it. A project whose answers **are** the
 defaults ships no config file. Unknown keys are rejected, so a typo cannot silently do nothing.
 
@@ -72,18 +72,18 @@ Wire up the scripts. On the npm route these four are exactly what `init` writes 
 where `init` does not run, add them by hand):
 
 ```jsonc
-"lint:docs":          "ai-doc-system check",
-"lint:docs:advisory": "ai-doc-system advisory",  // non-blocking
-"gen:docs-index":     "ai-doc-system gen",
-"docs:impact":        "ai-doc-system impact",    // non-blocking
+"lint:docs":          "docs-notary check",
+"lint:docs:advisory": "docs-notary advisory",  // non-blocking
+"gen:docs-index":     "docs-notary gen",
+"docs:impact":        "docs-notary impact",    // non-blocking
 ```
 
 On the vendored route write the same four as `node scripts/check-docs.mjs`,
 `node scripts/check-docs-advisory.mjs`, `node scripts/gen-docs-index.mjs` and
 `node scripts/impact-docs.mjs`, plus a fifth: `"test:scripts": "node --test scripts/*.test.mjs"`.
 
-Run these as `npx ai-doc-system …` (npm install) or `node scripts/<script>.mjs` (vendored — the script names differ from the command names: `check` is `check-docs.mjs`, `new` is `new-doc.mjs`, `mv` is `mv-doc.mjs`, `gen` is `gen-docs-index.mjs`); a bare
-`ai-doc-system` is on PATH only inside an npm script.
+Run these as `npx docs-notary …` (npm install) or `node scripts/<script>.mjs` (vendored — the script names differ from the command names: `check` is `check-docs.mjs`, `new` is `new-doc.mjs`, `mv` is `mv-doc.mjs`, `gen` is `gen-docs-index.mjs`); a bare
+`docs-notary` is on PATH only inside an npm script.
 
 `lint:docs` goes in the blocking gate — cheap, so put it before the type checks. `lint:docs:advisory`
 goes wherever the project keeps non-blocking checks. On pull requests add two steps:
@@ -96,12 +96,12 @@ job summary and always exits 0. Both need full history — set `fetch-depth: 0` 
 ## 3. Migrate
 
 Copy `templates/docs-migration.map.example.mjs` (from `${CLAUDE_PLUGIN_ROOT}/templates/` or
-`node_modules/@puralex/ai-doc-system/templates/`) to the target root as `docs-migration.map.mjs` and
+`node_modules/@puralex/docs-notary/templates/`) to the target root as `docs-migration.map.mjs` and
 write the real map. Then:
 
 ```bash
-npx ai-doc-system migrate --dry-run    # print the map + the files whose refs would change
-npx ai-doc-system migrate --apply      # git mv, stamp frontmatter, rewrite references
+npx docs-notary migrate --dry-run    # print the map + the files whose refs would change
+npx docs-notary migrate --apply      # git mv, stamp frontmatter, rewrite references
 ```
 
 (Vendored: `node scripts/migrate-docs.mjs`, and the same for `gen-docs-index.mjs` and
@@ -117,7 +117,7 @@ Then, in this order:
    for a link whose target never existed, de-link the text rather than inventing a target.
 3. **Copy `templates/docs-README.template.md`** to `<docsDir>/README.md` and edit it to match the
    project's actual tiers.
-4. `npx ai-doc-system gen`, then `npx ai-doc-system check` until it prints OK. A violation you
+4. `npx docs-notary gen`, then `npx docs-notary check` until it prints OK. A violation you
    do not understand is docs-gate.
 5. **Delete `docs-migration.map.mjs`** from the target (and, on the vendored route,
    `migrate-docs.mjs` together with `migrate-docs.test.mjs`, which imports it). They ran once.
@@ -125,7 +125,7 @@ Then, in this order:
    grep `docs/` blind*, plus the promotion rule and where other tools' documents get sorted
    (docs-sort).
 
-The plugin's two hooks need an engine: `npm install -D @puralex/ai-doc-system` in the target is what
+The plugin's two hooks need an engine: `npm install -D @puralex/docs-notary` in the target is what
 makes them speak. On the vendored route they stay silent.
 
 ## 4. What the migration must not decide

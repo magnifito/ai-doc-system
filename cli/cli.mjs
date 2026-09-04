@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Package entry point: `npx ai-doc-system <command>` run from the host
+ * Package entry point: `npx docs-notary <command>` run from the host
  * repository's root. Each command is one of the scripts; flags after the
  * command pass straight through (`--apply`, `--dry-run`, `--check`, `--all`).
  * Vendoring the scripts and running them with `node` directly stays supported —
@@ -32,7 +32,7 @@ if (command === '--version' || command === '-v') {
 }
 
 if (!COMMANDS[command]) {
-  console.error('usage: ai-doc-system <command> [flags]\n')
+  console.error('usage: docs-notary <command> [flags]\n')
   for (const [name, [, help]] of Object.entries(COMMANDS)) {
     console.error(`  ${name.padEnd(10)} ${help}`)
   }

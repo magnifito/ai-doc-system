@@ -69,23 +69,23 @@ jobs:
           # Missing `files` entry check: skills/ must ship, SKILL.md must not.
           # A root SKILL.md would make Claude Code ignore skills/ entirely, so the
           # negative half matters as much as the positive one.
-          test -f node_modules/@puralex/ai-doc-system/skills/docs-gate/SKILL.md
-          test ! -f node_modules/@puralex/ai-doc-system/SKILL.md
-          npx ai-doc-system --version
-          npx ai-doc-system gen
-          npx ai-doc-system check
-          npx ai-doc-system advisory
+          test -f node_modules/@puralex/docs-notary/skills/docs-gate/SKILL.md
+          test ! -f node_modules/@puralex/docs-notary/SKILL.md
+          npx docs-notary --version
+          npx docs-notary gen
+          npx docs-notary check
+          npx docs-notary advisory
           # Every command the CLI exposes, driven from the INSTALLED tarball:
           # a `files` entry left out, or a script the dispatcher cannot reach,
           # shows up here and nowhere else.
-          npx ai-doc-system new docs/product/hello.md --title Hello --summary "First doc."
+          npx docs-notary new docs/product/hello.md --title Hello --summary "First doc."
           echo node_modules > .gitignore
           git add -A
           git -c user.name=ci -c user.email=ci@example.com commit -qm smoke
-          npx ai-doc-system mv docs/product/hello.md docs/engineering/hello.md
-          npx ai-doc-system gen
-          npx ai-doc-system check
-          npx ai-doc-system verify
-          npx ai-doc-system impact
-          npx ai-doc-system context --kind engineering
-          npx ai-doc-system export | head -1
+          npx docs-notary mv docs/product/hello.md docs/engineering/hello.md
+          npx docs-notary gen
+          npx docs-notary check
+          npx docs-notary verify
+          npx docs-notary impact
+          npx docs-notary context --kind engineering
+          npx docs-notary export | head -1

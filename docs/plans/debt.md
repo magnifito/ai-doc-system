@@ -15,7 +15,7 @@ advisory clean. Items are ranked within each section; the first section is verif
 ## 1. Defects (verified in a fixture tree)
 
 1. **URLs trip assertion 5b.** A tracked file outside `docs/` that contains
-   `https://github.com/magnifito/ai-doc-system/blob/main/docs/engineering/design.md` fails the gate
+   `https://github.com/magnifito/docs-notary/blob/main/docs/engineering/design.md` fails the gate
    with "a tracked file references docs/engineering/design.md, which does not exist". The `git grep`
    pattern and the JavaScript regex in `scripts/check-docs.mjs` (`trackedDocRefs`) match inside
    URLs. Any host repository that links to this project's own docs on GitHub hits it. Fix: drop

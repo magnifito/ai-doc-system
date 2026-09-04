@@ -113,7 +113,7 @@ test('the exclusion list is configurable per project', () => {
 test('a docs path inside a URL is not a reference to this repository', () => {
   withGitFixture(
     {
-      'CLAUDE.md': 'See https://github.com/magnifito/ai-doc-system/blob/main/docs/engineering/design.md and docs/engineering/local.md\n',
+      'CLAUDE.md': 'See https://github.com/magnifito/docs-notary/blob/main/docs/engineering/design.md and docs/engineering/local.md\n',
       'docs/engineering/local.md': '---\ntitle: L\nkind: engineering\nstatus: active\nupdated: 2026-08-17\n---\n# L\n',
     },
     (root) => {
@@ -130,7 +130,7 @@ test('a leading ./ is a reference to this tree; ../ and URLs are not', () => {
       'README.md': [
         '[here](./docs/engineering/local.md)',
         '[up](../docs/engineering/design.md)',
-        '[web](https://github.com/magnifito/ai-doc-system/blob/main/docs/engineering/design.md)',
+        '[web](https://github.com/magnifito/docs-notary/blob/main/docs/engineering/design.md)',
         '',
       ].join('\n'),
       'docs/engineering/local.md': DOC,
@@ -147,7 +147,7 @@ test('an installed dependency is somebody else\'s repository, not a dead pointer
       'docs/engineering/testing.md': DOC,
       // A vendored copy of this very package: its templates and tests name
       // `docs/...` paths that are deliberately absent from the host tree.
-      'node_modules/@puralex/ai-doc-system/templates/docs-README.template.md':
+      'node_modules/@puralex/docs-notary/templates/docs-README.template.md':
         'Write it at docs/product/example.md and run the gate.\n',
       'src/app.ts': '// See docs/engineering/testing.md for the suite.\n',
     },

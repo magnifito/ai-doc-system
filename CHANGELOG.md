@@ -5,6 +5,19 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.1] - 2026-09-04
+
+### Changed
+
+- One name: **docs-notary**. The repository is `magnifito/docs-notary`, the npm package is
+  `@puralex/docs-notary`, the CLI is `docs-notary` (`ai-doc-system` stays as an alias bin of the
+  same package), and the Claude Code plugin was already `docs-notary`. Every link, the `$schema`
+  URL, the marketplace line (`/plugin marketplace add magnifito/docs-notary`) and the site
+  (`https://magnifito.github.io/docs-notary/`) follow. GitHub redirects the old
+  `magnifito/ai-doc-system` URLs; the old Pages URL does not. `@puralex/ai-doc-system` stays on
+  npm at 1.5.0 and gets no further releases. Earlier entries below keep the old names as they
+  were.
+
 ## [1.5.0] - 2026-09-04
 
 ### Added
@@ -129,7 +142,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   wires `lint:docs` / `lint:docs:advisory` / `gen:docs-index` into the host `package.json` without
   clobbering existing scripts, and generates the index so `check` passes immediately. Idempotent.
 - Claude Code plugin packaging: `.claude-plugin/plugin.json` and a self-hosted marketplace
-  (`/plugin marketplace add magnifito/ai-doc-system`).
+  (`/plugin marketplace add magnifito/docs-notary`).
 - npm provenance attestation on published packages.
 - CI: pack-smoke job installs the packed tarball into a fresh fixture repo and runs the CLI from
   `node_modules`; test matrix covers Node 20/22/24 on Linux and Node 20 on macOS and Windows.
@@ -170,8 +183,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Optional module axis with `state` / `todo` kinds (`evidence` / `changes` validation).
 - `SKILL.md` agent procedure.
 
-[1.4.0]: https://github.com/magnifito/ai-doc-system/compare/v1.3.0...v1.4.0
-[1.3.0]: https://github.com/magnifito/ai-doc-system/compare/v1.2.0...v1.3.0
-[1.2.0]: https://github.com/magnifito/ai-doc-system/compare/v1.1.0...v1.2.0
-[1.1.0]: https://github.com/magnifito/ai-doc-system/compare/v1.0.0...v1.1.0
-[1.0.0]: https://github.com/magnifito/ai-doc-system/releases/tag/v1.0.0
+[1.4.0]: https://github.com/magnifito/docs-notary/compare/v1.3.0...v1.4.0
+[1.3.0]: https://github.com/magnifito/docs-notary/compare/v1.2.0...v1.3.0
+[1.2.0]: https://github.com/magnifito/docs-notary/compare/v1.1.0...v1.2.0
+[1.1.0]: https://github.com/magnifito/docs-notary/compare/v1.0.0...v1.1.0
+[1.0.0]: https://github.com/magnifito/docs-notary/releases/tag/v1.0.0

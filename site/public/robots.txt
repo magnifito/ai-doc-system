@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://magnifito.github.io/ai-doc-system/sitemap-index.xml
+Sitemap: https://magnifito.github.io/docs-notary/sitemap-index.xml

@@ -4,7 +4,7 @@
  * the host project keeps its non-blocking checks; it always exits 0.
  *
  * Three things the blocking gate deliberately refuses to assert (design section
- * 5.3 — github.com/magnifito/ai-doc-system), because any one of them would fail
+ * 5.3 — github.com/magnifito/docs-notary), because any one of them would fail
  * a push for a reason unrelated to the change that triggered it:
  *
  *   1. `code-pointer` — `code:` pointers that no longer resolve. An ordinary

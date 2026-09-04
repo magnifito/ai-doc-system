@@ -25,7 +25,7 @@ routinely read **outside its tree** — pasted into a conversation, handed to an
 opened from a search result — and in that setting a path-derived field is simply absent. The
 document then cannot say what it is. Self-containment is worth one cheap assertion, and a
 duplicate that is machine-checked on every push cannot drift. The price is that `git mv` alone no
-longer re-tiers a file; `fix-docs-frontmatter.mjs` (today, `ai-doc-system fix`) restamps the whole
+longer re-tiers a file; `fix-docs-frontmatter.mjs` (today, `docs-notary fix`) restamps the whole
 tree — every document, not only the one that moved — in one command.
 
 The same argument carries `module`, which is derived, stored and asserted identically.
@@ -35,8 +35,8 @@ The same argument carries `module`, which is derived, stored and asserted identi
 - **`git mv` alone no longer re-tiers a document.** The path implies a new `kind`, the stored field
   still says the old one, and the gate fails the pair with a `vocabulary` violation until the
   frontmatter is restamped.
-- **Two commands restamp it.** `ai-doc-system fix` rewrites `kind` and `module` across the whole
-  tree after a move; `ai-doc-system mv <from> <to>` does the move and the restamp together, and
+- **Two commands restamp it.** `docs-notary fix` rewrites `kind` and `module` across the whole
+  tree after a move; `docs-notary mv <from> <to>` does the move and the restamp together, and
   records `promoted_from` when the move crosses tiers.
 - **The duplication cannot drift**, because the gate compares the two on every push. That is the
   whole trade: one cheap assertion in exchange for a document that says what it is anywhere.

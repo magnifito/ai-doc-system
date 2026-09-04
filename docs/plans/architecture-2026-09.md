@@ -306,7 +306,7 @@ Append to `scripts/tracked-refs.test.mjs`, using its `withGitFixture` helper:
 test('a docs path inside a URL is not a reference to this repository', () => {
   withGitFixture(
     {
-      'CLAUDE.md': 'See https://github.com/magnifito/ai-doc-system/blob/main/docs/engineering/design.md and docs/engineering/local.md\n',
+      'CLAUDE.md': 'See https://github.com/magnifito/docs-notary/blob/main/docs/engineering/design.md and docs/engineering/local.md\n',
       'docs/engineering/local.md': '---\ntitle: L\nkind: engineering\nstatus: active\nupdated: 2026-08-17\n---\n# L\n',
     },
     (root) => {
@@ -478,7 +478,7 @@ Call it: `overrides = foldExtensions(JSON.parse(...))`. `validate`'s unknown-key
 }
 ```
 
-`schema/docs-system.config.schema.json`: a draft-07 schema with `$id` `https://raw.githubusercontent.com/magnifito/ai-doc-system/main/schema/docs-system.config.schema.json`, `additionalProperties: false`, one property per `DEFAULTS` key and one per `<key>+` for each array key, `rules` as an object whose `additionalProperties` is `{ "enum": ["error", "warn", "off"] }`, `modules` items with `key`, `class` enum `core|anchor|addon`, `requires` array, `tiers` as array of 2-tuples. Add a test in `scripts/docs-config.test.mjs`:
+`schema/docs-system.config.schema.json`: a draft-07 schema with `$id` `https://raw.githubusercontent.com/magnifito/docs-notary/main/schema/docs-system.config.schema.json`, `additionalProperties: false`, one property per `DEFAULTS` key and one per `<key>+` for each array key, `rules` as an object whose `additionalProperties` is `{ "enum": ["error", "warn", "off"] }`, `modules` items with `key`, `class` enum `core|anchor|addon`, `requires` array, `tiers` as array of 2-tuples. Add a test in `scripts/docs-config.test.mjs`:
 
 ```js
 test('the JSON schema names every DEFAULTS key and its "+" form for arrays', () => {

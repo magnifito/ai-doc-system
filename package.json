@@ -1,6 +1,6 @@
 {
-  "name": "@puralex/ai-doc-system",
-  "version": "1.5.0",
+  "name": "@puralex/docs-notary",
+  "version": "1.5.1",
   "description": "Tier a repository's docs by authority, validate frontmatter, generate an agent-readable index, and enforce it with a blocking gate.",
   "keywords": [
     "documentation",
@@ -17,7 +17,7 @@
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/magnifito/ai-doc-system.git"
+    "url": "git+https://github.com/magnifito/docs-notary.git"
   },
   "engines": {
     "node": ">=20"
@@ -26,6 +26,7 @@
     "access": "public"
   },
   "bin": {
+    "docs-notary": "cli/cli.mjs",
     "ai-doc-system": "cli/cli.mjs"
   },
   "files": [

@@ -1,11 +1,11 @@
-# ai-doc-system
+# docs-notary
 
-[![test](https://github.com/magnifito/ai-doc-system/actions/workflows/test.yml/badge.svg)](https://github.com/magnifito/ai-doc-system/actions/workflows/test.yml)
-[![npm](https://img.shields.io/npm/v/%40puralex%2Fai-doc-system)](https://www.npmjs.com/package/@puralex/ai-doc-system)
+[![test](https://github.com/magnifito/docs-notary/actions/workflows/test.yml/badge.svg)](https://github.com/magnifito/docs-notary/actions/workflows/test.yml)
+[![npm](https://img.shields.io/npm/v/%40puralex%2Fdocs-notary)](https://www.npmjs.com/package/@puralex/docs-notary)
 [![license](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 
 A documentation system for repositories whose primary reader is an AI agent.
-**Website: [magnifito.github.io/ai-doc-system](https://magnifito.github.io/ai-doc-system/)**
+**Website: [magnifito.github.io/docs-notary](https://magnifito.github.io/docs-notary/)**
 
 `docs/` is tiered by **authority** — how much weight a reader should give a document — rather than
 by topic. Every file carries validated frontmatter. An index is generated for agents to read instead
@@ -35,13 +35,13 @@ into an explicitly non-binding idea bank, and it is checkable by machine.
 | `advisory` | Non-blocking: dead `code:` pointers, `updated:`-versus-git drift, `state` docs whose code moved after `verified_on`. |
 | `fix` | Restamps `kind` and `module` across the tree after a move. |
 | `migrate` | One-shot: `git mv` into the tiers, stamp frontmatter, rewrite every tracked reference. Deleted after it runs. |
-| `hooks/` | Claude Code plugin hooks — a "not a commitment" reminder when a `reference` doc is read, and the gate's verdict after every doc edit. Neither ever blocks. Both run the engine the host installed (`node_modules/@puralex/ai-doc-system`); with the scripts only vendored they stay silent. |
+| `hooks/` | Claude Code plugin hooks — a "not a commitment" reminder when a `reference` doc is read, and the gate's verdict after every doc edit. Neither ever blocks. Both run the engine the host installed (`node_modules/@puralex/docs-notary`); with the scripts only vendored they stay silent. |
 | `schema/docs-system.config.schema.json` | JSON Schema for `docs-system.config.json`: editor completion and validation of every key. |
 | `scripts/docs-config.mjs` | Per-project configuration, with defaults that need no config file. |
 | `scripts/*.test.mjs` | The test suite, over throwaway fixture trees, some of them real git repositories. Wire it in — a suite no runner executes is green exactly once. |
 | `skills/` | Five skills an agent picks by situation: `docs-adopt` (first-time setup and migration), `docs-sort` (file and stamp documents other tools wrote), `docs-promote` (promote, move, supersede), `docs-audit` (periodic judgement: advisory, verify, impact), `docs-gate` (fix a red gate). |
 | `templates/` | The migration map to fill in, and the `docs/README.md` contract to adapt. |
-| `cli/cli.mjs` | Package entry point — `ai-doc-system init\|new\|mv\|check\|verify\|advisory\|impact\|context\|export\|gen\|fix\|migrate` — for npm-based installs. |
+| `cli/cli.mjs` | Package entry point — `docs-notary init\|new\|mv\|check\|verify\|advisory\|impact\|context\|export\|gen\|fix\|migrate` — for npm-based installs. |
 | `docs/` | This repo's own gated tree; `engineering/design.md` is the full design: the problem, the rejected alternatives, and the limitations that survived implementation. |
 
 Plain ESM, Node 20+, one dependency: the `yaml` package — frontmatter holds lists and colon-bearing
@@ -64,7 +64,7 @@ docs/
 ```
 
 `kind` is **derived from the path** and mirrored in frontmatter — moving a file between tiers is
-what changes its kind: `ai-doc-system mv` does the move and the restamp together, and `ai-doc-system
+what changes its kind: `docs-notary mv` does the move and the restamp together, and `docs-notary
 fix` restamps a move made by hand.
 
 Change any of it in `docs-system.config.json`; a project whose answers are the defaults ships no
@@ -94,7 +94,7 @@ date that warns once it is in the past), `promoted_from:` (written by `mv`). Req
 `kind` and `module` are derived from the path **and** stored, and the gate rejects a document where
 the two disagree. Storing them is what lets a document say what it is when it is read outside the
 tree; the assertion is what stops the duplicate drifting. After moving files by hand, run
-`ai-doc-system fix` to restamp both.
+`docs-notary fix` to restamp both.
 
 ### The optional module axis
 
@@ -164,25 +164,25 @@ resolves, whether `updated:` matches git — is argued in [`docs/engineering/des
 From npm:
 
 ```bash
-npm install -D @puralex/ai-doc-system   # brings `yaml` with it
-npx ai-doc-system init                  # greenfield: docs/ contract + index + scripts, gate-clean
-npx ai-doc-system new docs/<tier>/<name>.md --title "Recurring invoices" --summary "How billing recurs"
-npx ai-doc-system mv docs/<tier>/<name>.md docs/<other-tier>/<name>.md   # promote: move, restamp, record
-npx ai-doc-system mv docs/<elsewhere>/<name>.md docs/<tier>/<name>.md --adopt   # sort a stray: move + stamp frontmatter
-npx ai-doc-system gen                   # regenerate INDEX.md and index.json
-npx ai-doc-system check                 # the blocking gate
-npx ai-doc-system check --json          # the same verdict as machine-readable JSON
-npx ai-doc-system check --all           # print every error, not the first 100 (warnings always print in full)
-npx ai-doc-system check --base origin/main    # + the history-aware rules, over what this branch changed
-npx ai-doc-system verify --only docs/<tier>/<name>.md --stamp   # run the evidence, then stamp verified_on
-npx ai-doc-system impact --base origin/main   # which documents claim the changed paths
-npx ai-doc-system context --kind product --status active --max-chars 40000
-npx ai-doc-system export --status shipped > docs.jsonl
-npx ai-doc-system advisory              # non-blocking drift report
-npx ai-doc-system fix                   # restamp kind/module after moves
+npm install -D @puralex/docs-notary   # brings `yaml` with it
+npx docs-notary init                  # greenfield: docs/ contract + index + scripts, gate-clean
+npx docs-notary new docs/<tier>/<name>.md --title "Recurring invoices" --summary "How billing recurs"
+npx docs-notary mv docs/<tier>/<name>.md docs/<other-tier>/<name>.md   # promote: move, restamp, record
+npx docs-notary mv docs/<elsewhere>/<name>.md docs/<tier>/<name>.md --adopt   # sort a stray: move + stamp frontmatter
+npx docs-notary gen                   # regenerate INDEX.md and index.json
+npx docs-notary check                 # the blocking gate
+npx docs-notary check --json          # the same verdict as machine-readable JSON
+npx docs-notary check --all           # print every error, not the first 100 (warnings always print in full)
+npx docs-notary check --base origin/main    # + the history-aware rules, over what this branch changed
+npx docs-notary verify --only docs/<tier>/<name>.md --stamp   # run the evidence, then stamp verified_on
+npx docs-notary impact --base origin/main   # which documents claim the changed paths
+npx docs-notary context --kind product --status active --max-chars 40000
+npx docs-notary export --status shipped > docs.jsonl
+npx docs-notary advisory              # non-blocking drift report
+npx docs-notary fix                   # restamp kind/module after moves
 ```
 
-**Upgrade step:** run `ai-doc-system gen` once after upgrading — `index.json` gains `by_code` and
+**Upgrade step:** run `docs-notary gen` once after upgrading — `index.json` gains `by_code` and
 `INDEX.md` a Summary column, and the `index` rule compares bytes.
 
 `check --base <ref>` resolves the merge base of `<ref>` and `HEAD`, judges only the documents the
@@ -195,8 +195,8 @@ line numbers yet), and `impact` posts the documents a pull request may have fals
 summary:
 
 ```yaml
-- run: npx ai-doc-system check --format github --base origin/${{ github.base_ref || 'main' }}
-- run: npx ai-doc-system impact --base origin/${{ github.base_ref || 'main' }}
+- run: npx docs-notary check --format github --base origin/${{ github.base_ref || 'main' }}
+- run: npx docs-notary impact --base origin/${{ github.base_ref || 'main' }}
 ```
 
 **`verify` is the only command that executes anything written in a document.** Command-form
@@ -212,7 +212,7 @@ than replacing it:
 
 ```json
 {
-  "$schema": "https://raw.githubusercontent.com/magnifito/ai-doc-system/main/schema/docs-system.config.schema.json",
+  "$schema": "https://raw.githubusercontent.com/magnifito/docs-notary/main/schema/docs-system.config.schema.json",
   "evidenceRunners+": ["bazel"],
   "rules": { "shipped-code": "error" }
 }
@@ -224,7 +224,7 @@ decide it silently.
 Or install as a Claude Code plugin and let an agent drive it:
 
 ```
-/plugin marketplace add magnifito/ai-doc-system
+/plugin marketplace add magnifito/docs-notary
 /plugin install docs-notary@magnifito
 ```
 
@@ -237,9 +237,9 @@ survey and the migration, and the other four take over once `docs/index.json` ex
 By hand, the short version:
 
 ```bash
-cp /path/to/ai-doc-system/scripts/*.mjs scripts/
+cp /path/to/docs-notary/scripts/*.mjs scripts/
 npm install yaml            # or the host's package manager equivalent
-cp /path/to/ai-doc-system/templates/docs-migration.map.example.mjs docs-migration.map.mjs
+cp /path/to/docs-notary/templates/docs-migration.map.example.mjs docs-migration.map.mjs
 $EDITOR docs-migration.map.mjs
 node scripts/migrate-docs.mjs --dry-run    # iterate until every row is right
 node scripts/migrate-docs.mjs --apply

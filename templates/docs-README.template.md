@@ -20,8 +20,8 @@ them.
 
 `kind` is **derived from the path and also stored in frontmatter**; the gate rejects a document
 where the two disagree. Moving a file between tiers changes what the path implies — use
-`ai-doc-system mv <from> <to>`, which moves, restamps `kind`/`module`/`status` and `updated`, and
-records `promoted_from`. (`ai-doc-system fix` restamps a move already made by hand; a bare `git mv`
+`docs-notary mv <from> <to>`, which moves, restamps `kind`/`module`/`status` and `updated`, and
+records `promoted_from`. (`docs-notary fix` restamps a move already made by hand; a bare `git mv`
 writes no `promoted_from` and fails `promoted-verbatim` under `check --base`.)
 
 ## Frontmatter
@@ -45,8 +45,8 @@ omit while unbuilt), `source_url:` (where a captured document came from), `revie
 once past, the gate warns). Required when `status: superseded`: `superseded_by:`, whose target must
 exist.
 
-Do not hand-write the block: `ai-doc-system new <path> --title "…" --summary "…"` writes a document
-that passes the gate on its first run, and `ai-doc-system mv <from> <to>` moves one between tiers,
+Do not hand-write the block: `docs-notary new <path> --title "…" --summary "…"` writes a document
+that passes the gate on its first run, and `docs-notary mv <from> <to>` moves one between tiers,
 restamping `kind`/`status` and recording `promoted_from`. Both regenerate the index.
 
 `status: reference` is legal only under `reference/`, and everything under `reference/` must carry
@@ -59,7 +59,7 @@ reference/   →   product/    →   plans/   →   plans/done/
 (inspiration)   (committed)     (active)      (shipped)
 ```
 
-1. `ai-doc-system mv docs/reference/<area>/<feature>/PRD.md docs/product/<feature>.md` — the move,
+1. `docs-notary mv docs/reference/<area>/<feature>/PRD.md docs/product/<feature>.md` — the move,
    the restamp of `kind`/`status`/`updated`, and `promoted_from`, in one command.
 2. Add `implements: docs/product/ROADMAP.md#<phase>`.
 3. **Rewrite the prose to describe this product, not the source it was captured from.** Mandatory —
@@ -79,5 +79,5 @@ is dead — inside `docs/` and from every tracked file outside it — and that `
 live replacement. Advisory-only drift reports (`code:` pointers, `updated:` versus git) live in
 `check-docs-advisory.mjs`.
 
-The system this tree implements is `ai-doc-system` — design and rationale in that repository's
+The system this tree implements is `docs-notary` — design and rationale in that repository's
 `docs/engineering/design.md`.

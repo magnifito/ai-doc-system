@@ -1,6 +1,6 @@
 ---
 name: docs-promote
-description: Use when a document in a repository with docs/index.json must change authority or place — promote a captured reference document into product or engineering scope, move a file between tiers, take a plan from draft to active to shipped, supersede a document with a newer one, or retire one to archive. Drives ai-doc-system mv and the status transition rules that check --base enforces, and insists on the prose rewrite no command can do. Not for a stray with no frontmatter (docs-sort) or a red gate (docs-gate).
+description: Use when a document in a repository with docs/index.json must change authority or place — promote a captured reference document into product or engineering scope, move a file between tiers, take a plan from draft to active to shipped, supersede a document with a newer one, or retire one to archive. Drives docs-notary mv and the status transition rules that check --base enforces, and insists on the prose rewrite no command can do. Not for a stray with no frontmatter (docs-sort) or a red gate (docs-gate).
 ---
 
 # Promote, move, or retire a document
@@ -12,14 +12,14 @@ a move is a claim, and `check --base` verifies the claim against the branch's hi
 
 Installed as a plugin, `docs-notary`'s `reference-read` hook says so on every Read of a document
 whose status is `reference`: not a commitment, never a build spec, and here is the `mv` that
-promotes it. The hooks run the engine the host repository installed (`node_modules/@puralex/ai-doc-system`), or the plugin's own copy only in a clone where `yaml` resolves; a plugin install is a bare clone, so on the vendored route both hooks are silent. Promote it first, then **rewrite the prose to describe this product**:
+promotes it. The hooks run the engine the host repository installed (`node_modules/@puralex/docs-notary`), or the plugin's own copy only in a clone where `yaml` resolves; a plugin install is a bare clone, so on the vendored route both hooks are silent. Promote it first, then **rewrite the prose to describe this product**:
 
 ```bash
-ai-doc-system mv docs/reference/<name>.md docs/product/<name>.md
+docs-notary mv docs/reference/<name>.md docs/product/<name>.md
 ```
 
-Run these as `npx ai-doc-system …` (npm install) or `node scripts/<script>.mjs` (vendored — the script names differ from the command names: `check` is `check-docs.mjs`, `new` is `new-doc.mjs`, `mv` is `mv-doc.mjs`, `gen` is `gen-docs-index.mjs`); a bare
-`ai-doc-system` is on PATH only inside an npm script.
+Run these as `npx docs-notary …` (npm install) or `node scripts/<script>.mjs` (vendored — the script names differ from the command names: `check` is `check-docs.mjs`, `new` is `new-doc.mjs`, `mv` is `mv-doc.mjs`, `gen` is `gen-docs-index.mjs`); a bare
+`docs-notary` is on PATH only inside an npm script.
 
 `mv` is `git mv` plus a restamp: it sets `kind` and `module` for the destination, and sets `status`
 to the destination tier's forced status if it has one, else `--status`, else `draft` when leaving
@@ -63,7 +63,7 @@ When a newer document replaces an older one:
 
 1. Set `superseded_by: docs/<tier>/<new-name>.md` on the old file. Leave `status` alone —
    `superseded` outside `archive/` is a `vocabulary` error.
-2. Move it: `ai-doc-system mv docs/<tier>/<old-name>.md docs/archive/<old-name>.md`. The
+2. Move it: `docs-notary mv docs/<tier>/<old-name>.md docs/archive/<old-name>.md`. The
    `archive/` tier forces `status: superseded`. The prose stays as it was — an archived document is
    a record, and `check --base` owes it no rewrite.
 3. Fix every link that pointed at it. The gate catches a link still naming the old path (`link`:
@@ -76,16 +76,16 @@ says. A "closed" plan that still lists untaken steps is a live backlog and stays
 ## 4. Moves within a tier and hand-made moves
 
 A rename inside one tier keeps status and needs no `promoted_from`; `mv` handles it, and sets
-`updated` to today as it does on any move. After a move made by hand, `ai-doc-system fix` restamps
+`updated` to today as it does on any move. After a move made by hand, `docs-notary fix` restamps
 `kind` and `module` — the gate asserts they agree with the path. `git mv` renames for case alone in
 one step. A file with no frontmatter at all is a stray, not a move: docs-sort.
 
 ## 5. Before you finish
 
 ```bash
-ai-doc-system gen
-ai-doc-system check --base <default-branch>   # transition + promoted-verbatim run only here
-ai-doc-system impact --base <default-branch>  # documents whose claims cover the changed code
+docs-notary gen
+docs-notary check --base <default-branch>   # transition + promoted-verbatim run only here
+docs-notary impact --base <default-branch>  # documents whose claims cover the changed code
 ```
 
 Update every link the move broke, then every document `impact` lists. A red gate is docs-gate.

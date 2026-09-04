@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://raw.githubusercontent.com/magnifito/ai-doc-system/main/schema/docs-system.config.schema.json",
-  "title": "ai-doc-system configuration",
+  "$id": "https://raw.githubusercontent.com/magnifito/docs-notary/main/schema/docs-system.config.schema.json",
+  "title": "docs-notary configuration",
   "description": "Per-project overrides for the documentation gate. Every key defaults to the value in scripts/docs-config.mjs; an array key may instead be written as \"<key>+\" to append to that default rather than replace it.",
   "type": "object",
   "additionalProperties": false,

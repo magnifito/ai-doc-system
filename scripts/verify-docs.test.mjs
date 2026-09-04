@@ -223,7 +223,7 @@ test('a lock that is not valid JSON is reported as a violation, never thrown', (
     assert.ok(hit, 'a corrupt lock must be reported')
     assert.equal(hit.file, 'docs/evidence-lock.json')
     assert.equal(hit.severity, 'warn')
-    assert.match(hit.message, /is not valid JSON — delete it and re-run `ai-doc-system verify`/)
+    assert.match(hit.message, /is not valid JSON — delete it and re-run `docs-notary verify`/)
   } finally {
     clearConfigCache()
     rmSync(root, { recursive: true, force: true })

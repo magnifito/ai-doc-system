@@ -6,7 +6,7 @@ body:
     id: version
     attributes:
       label: Version
-      description: Output of `npx ai-doc-system --version`
+      description: Output of `npx docs-notary --version`
       placeholder: 1.3.0
     validations:
       required: true
@@ -32,7 +32,7 @@ body:
         status: active
         updated: 2026-08-27
         ---
-        then `npx ai-doc-system check` prints …
+        then `npx docs-notary check` prints …
     validations:
       required: true
   - type: textarea
