@@ -169,7 +169,76 @@ const description =
       <Lifecycle />
     </section>
 
-    <!-- stage 8 · proof -->
+    <!-- stage 8 · the skills. Five situations, one skill each; the agent lands
+         in a situation, not in a manual. -->
+    <section class="doc" id="skills">
+      <p class="frontmatter" aria-hidden="true">
+        <span class="line"><span class="fence">---</span></span>
+        <span class="line"><span class="key">kind:</span> <span class="value">skills</span></span>
+        <span class="line"><span class="key">count:</span> <span class="value">5</span></span>
+        <span class="line"><span class="fence">---</span></span>
+      </p>
+      <h2>Five skills, picked by <em>situation</em></h2>
+      <p>
+        An agent never asks "which command?". It lands in a situation — a red gate, a stray file,
+        a plan that claims to be done — and one skill answers it. Each is self-contained, names the
+        exact command, and says what no command can do for you.
+      </p>
+      <ul class="moves">
+        <li>
+          <span class="move-name">docs-adopt</span>
+          <p>
+            The tree has no <code>docs/index.json</code>. Survey first, four questions, then the
+            migration: tier every file, stamp every badge, wire the gate into CI. Never stamps
+            <code>shipped</code> on a plan's own say-so.
+          </p>
+        </li>
+        <li>
+          <span class="move-name">docs-sort</span>
+          <p>
+            Another tool wrote a document where it liked — <code>docs/superpowers/plans/</code>,
+            a spec with no frontmatter, a stray the index has never heard of. Read it, pick the
+            tier by <em>authority</em>, then one command moves it and writes the badge:
+          </p>
+<pre><code><span class="prompt">$</span> npx docs-notary mv docs/superpowers/plans/2026-09-04-invoices.md \
+    docs/plans/invoices.md --adopt --summary "Recurring invoices, phase 1."
+<span class="g">moved … -> docs/plans/invoices.md (kind plan, status draft)</span>
+<span class="c">Stamped frontmatter from the heading; check the title, and give it
+evidence or code if it claims a state.</span></code></pre>
+        </li>
+        <li>
+          <span class="move-name">docs-promote</span>
+          <p>
+            A document must change authority: reference to draft, active to shipped, live to
+            archive. <code>mv</code> does the move and records where it came from; the gate's
+            history-aware rules then refuse a promotion that kept someone else's prose verbatim.
+          </p>
+        </li>
+        <li>
+          <span class="move-name">docs-audit</span>
+          <p>
+            "Are these docs still true?" The gate proves the tree is well-formed; it cannot prove a
+            claim. This skill runs <code>advisory</code>, <code>verify</code> and
+            <code>impact</code>, then decides document by document: restamp, rewrite, or archive.
+          </p>
+        </li>
+        <li>
+          <span class="move-name">docs-gate</span>
+          <p>
+            <code>check-docs FAILED</code>. Every violation ends in a rule id; the skill maps each
+            id to the one fix that removes the cause — and never to a severity change that makes
+            CI green.
+          </p>
+        </li>
+      </ul>
+      <p class="caption">
+        Installed as the docs-notary plugin, two hooks ride along: a "not a commitment" reminder
+        whenever a <code>reference</code> document is read, and the gate's verdict after every
+        edit under <code>docs/</code>. Neither blocks.
+      </p>
+    </section>
+
+    <!-- stage 9 · proof -->
     <section class="doc">
       <p class="frontmatter" aria-hidden="true">
         <span class="line"><span class="fence">---</span></span>
@@ -184,13 +253,14 @@ const description =
       </p>
       <ul class="stats">
         <li><strong>301</strong> docs migrated, history intact</li>
-        <li><strong>92</strong> tests on real git fixtures</li>
+        <li><strong>248</strong> tests on real git fixtures</li>
         <li><strong>3</strong> operating systems in CI</li>
         <li><strong>1</strong> dependency</li>
+        <li><strong>5</strong> skills, tested against the code they describe</li>
       </ul>
     </section>
 
-    <!-- stage 9 · install. The document reaches `shipped`. -->
+    <!-- stage 10 · install. The document reaches `shipped`. -->
     <section class="doc" id="install">
       <p class="frontmatter" aria-hidden="true">
         <span class="line"><span class="fence">---</span></span>
@@ -202,10 +272,11 @@ const description =
 
       <div class="paths">
         <div class="path">
-          <h3>As an agent skill — the full treatment</h3>
+          <h3>As a Claude Code plugin — the full treatment</h3>
           <p>
             Your agent surveys the tree, proposes the moves, stamps every badge, and wires the gate
-            in. The skill encodes the judgement calls, not just the mechanics.
+            in. From then on the <a href="#skills">other four skills</a> answer the situations as
+            they come up. The skills encode the judgement calls, not just the mechanics.
           </p>
 <pre><code><span class="c"># in Claude Code:</span>
 <span class="prompt">&gt;</span> /plugin marketplace add magnifito/docs-notary
